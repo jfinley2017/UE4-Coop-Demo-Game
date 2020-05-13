@@ -1,7 +1,7 @@
 #include "SFunctionLibrary.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
-#include "Config.h"
+#include "Public/Config.h"
 #include "Runtime/Engine/Classes/GameFramework/Actor.h"
 
 bool USFunctionLibrary::FindFloor(UWorld* World, FVector FindFrom, FVector& OutFoundLocation)

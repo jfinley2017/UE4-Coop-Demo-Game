@@ -6,6 +6,10 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Online.h"
 #include "OnlineSubsystem.h"
+#if PLATFORM_WINDOWS || PLATFORM_MAC || PLATFORM_LINUX
+#include "steam/isteamugc.h"
+#include "steam/isteamremotestorage.h"
+#endif
 #include "Interfaces/OnlineSessionInterface.h"
 
 // @todo Steam: Steam headers trigger secure-C-runtime warnings in Visual C++. Rather than mess with _CRT_SECURE_NO_WARNINGS, we'll just
@@ -79,6 +83,7 @@ public:
 UENUM(BlueprintType)
 enum class FBPSteamResult : uint8
 {
+	K_EResultInvalid = 0,
 	k_EResultOK = 1,							// success
 	k_EResultFail = 2,							// generic failure 
 	k_EResultNoConnection = 3,					// no/failed network connection
@@ -203,11 +208,22 @@ struct FBPSteamWorkshopItemDetails
 	GENERATED_USTRUCT_BODY()
 
 public:
+
 	FBPSteamWorkshopItemDetails()
 	{
-
+		ResultOfRequest = FBPSteamResult::k_EResultOK;
+		FileType = FBPWorkshopFileType::k_EWorkshopFileTypeMax;
+		CreatorAppID = 0;
+		ConsumerAppID = 0;
+		VotesUp = 0;
+		VotesDown = 0;
+		CalculatedScore = 0.f;
+		bBanned = false;
+		bAcceptedForUse = false;
+		bTagsTruncated = false;
 	}
 
+#if PLATFORM_WINDOWS || PLATFORM_MAC || PLATFORM_LINUX
 	FBPSteamWorkshopItemDetails(SteamUGCDetails_t &hUGCDetails)
 	{
 		ResultOfRequest = (FBPSteamResult)hUGCDetails.m_eResult;
@@ -245,6 +261,7 @@ public:
 
 		CreatorSteamID = FString::Printf(TEXT("%llu"), hUGCDetails.m_ulSteamIDOwner);
 	}
+#endif
 
 	// Result of obtaining the details
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Online|AdvancedSteamWorkshop")

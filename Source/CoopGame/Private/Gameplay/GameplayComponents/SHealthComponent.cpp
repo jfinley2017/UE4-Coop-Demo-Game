@@ -105,15 +105,15 @@ void USHealthComponent::BroadcastRelevantDamageEvents(AActor * DamagedActor, flo
     // Update damage and damage taken stats
     APawn* Damaged = Cast<APawn>(GetOwner());
     APawn* Damager = Cast<APawn>(DamageInstigatorActor);
-    if (Damaged && Damaged->PlayerState)
+    if (Damaged && Damaged->GetPlayerState())
     {
-        ASPlayerState* PS = Cast<ASPlayerState>(Damaged->PlayerState);
+        ASPlayerState* PS = Cast<ASPlayerState>(Damaged->GetPlayerState());
         PS->AddDamageTaken(Damage);
     }
 
-    if (Damager && Damager->PlayerState)
+    if (Damager && Damager->GetPlayerState())
     {
-        ASPlayerState* PS = Cast<ASPlayerState>(Damager->PlayerState);
+        ASPlayerState* PS = Cast<ASPlayerState>(Damager->GetPlayerState());
         PS->AddDamage(Damage);
     }
 }

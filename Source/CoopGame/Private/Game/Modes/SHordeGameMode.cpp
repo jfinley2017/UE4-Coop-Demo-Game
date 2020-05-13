@@ -164,10 +164,10 @@ void ASHordeGameMode::OnActorKilled_Implementation(AActor* KilledActor, AActor* 
         // fix this
         APawn* Killer = Cast<APawn>(KillerActor);
         ISPawn* Killed = Cast<ISPawn>(KilledActor);
-        if (Killer && Killed && Killer->PlayerState)
+        if (Killer && Killed && Killer->GetPlayerState())
         {
             // Score for the player
-            ASPlayerState* PS = Cast<ASPlayerState>(Killer->PlayerState);
+            ASPlayerState* PS = Cast<ASPlayerState>(Killer->GetPlayerState());
             PS->AddScore(Killed->GetOnKillScore());
             
             // Score for the team
@@ -181,9 +181,9 @@ void ASHordeGameMode::OnActorKilled_Implementation(AActor* KilledActor, AActor* 
     
     // If the killed actor was controlled by something, increase death count on the playerstate
     APawn* Killed = Cast<APawn>(KilledActor);
-    if (Killed && Killed->PlayerState)
+    if (Killed && Killed->GetPlayerState())
     {
-        ASPlayerState* PS = Cast<ASPlayerState>(Killed->PlayerState);
+        ASPlayerState* PS = Cast<ASPlayerState>(Killed->GetPlayerState());
         if (PS)
         {
             PS->AddDeaths(1);

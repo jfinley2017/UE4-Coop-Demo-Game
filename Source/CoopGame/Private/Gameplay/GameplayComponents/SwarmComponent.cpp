@@ -35,9 +35,9 @@ void USwarmComponent::InitializeOverlappingStuff()
 
     for (int32 i = 0; i < OverlappingComponents.Num(); i++)
     {
-        for (int32 i = 0; i < PowerUpActors.Num(); i++)
+        for (int32 j = 0; j < PowerUpActors.Num(); j++)
         {
-            if (OverlappingComponents[i]->GetOwner()->IsA(PowerUpActors[i]))
+            if (OverlappingComponents[i]->GetOwner()->IsA(PowerUpActors[j]))
             {
                 NumOverlappingActors++;
                 PowerLevel = NumOverlappingActors * PowerGainedPerActor;

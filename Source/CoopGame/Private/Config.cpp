@@ -1,4 +1,4 @@
-#include "Config.h"
+#include "Public/Config.h"
 #include "Engine/Engine.h"
 
 void UConfig::SetMouseSensitivity(float Sens)

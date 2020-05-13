@@ -3,7 +3,7 @@
 #include "SGameState.h"
 #include "Blueprint/UserWidget.h"
 #include "SPlayerState.h"
-#include "Config.h"
+#include "Public/Config.h"
 
 ASPlayerController::ASPlayerController()
     : APlayerController()
