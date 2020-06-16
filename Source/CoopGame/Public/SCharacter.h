@@ -24,7 +24,6 @@ public:
 	ASCharacter();
 
     virtual void Tick(float DeltaTime) override;
-
     // Called to bind functionality to input
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -32,6 +31,7 @@ public:
 	virtual void AddControllerYawInput(float Val);
 
     virtual FVector GetPawnViewLocation() const override;
+    virtual void GetActorEyesViewPoint(FVector&, FRotator& ) const override;
 
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "PlayerWeapon")
     float GetReloadSpeed();

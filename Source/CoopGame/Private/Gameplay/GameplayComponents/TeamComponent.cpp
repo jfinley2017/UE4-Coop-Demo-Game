@@ -7,7 +7,7 @@
 // Sets default values for this component's properties
 UTeamComponent::UTeamComponent()
 {
-    SetIsReplicated(true);
+    SetIsReplicatedByDefault(true);
 }
 
 void UTeamComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

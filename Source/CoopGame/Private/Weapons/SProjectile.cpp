@@ -15,22 +15,19 @@
 ASProjectile::ASProjectile()
 {
 
+    SetReplicates(true);
+    SetReplicateMovement(true);
+
     MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
     MeshComp->SetNotifyRigidBodyCollision(true);
     MeshComp->SetVisibility(true);
     SetRootComponent(MeshComp);
 
     MovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Projectile Movement Component"));
-    MovementComp->bAutoActivate = true;
-    MovementComp->SetUpdatedComponent(MeshComp);
-	MovementComp->InitialSpeed = ProjectileSpeed;
-	MovementComp->MaxSpeed = 5000.0f;
-
 	ExplosionStatus.bExploded = false;
 	ExplosionStatus.bWasDirectPawnHit = false;
 
-    SetReplicates(true);
-	SetReplicateMovement(true);
+    
 }
 
 void ASProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -46,8 +43,12 @@ void ASProjectile::Initialize(const FProjectileWeaponData &Data, bool bIsServer,
     WeaponData = Data;
     bIsServerProjectile = bIsServer;
     bWasInitialized = true;
+    MovementComp->Velocity = GetActorRotation().Vector() * ProjectileSpeed;
+    MovementComp->MaxSpeed = ProjectileSpeed;
+    MovementComp->InitialSpeed = ProjectileSpeed;
     MeshComp->MoveIgnoreActors.Append(ActorsToIgnore);
-
+    MovementComp->UpdateComponentVelocity();
+    
 }
 
 void ASProjectile::OnRep_bIsServerProjectile()

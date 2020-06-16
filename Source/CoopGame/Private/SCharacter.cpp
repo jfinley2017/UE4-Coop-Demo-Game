@@ -208,6 +208,18 @@ FVector ASCharacter::GetPawnViewLocation() const
 	return CameraComp ? CameraComp->GetComponentLocation() : Super::GetPawnViewLocation();
 }
 
+void ASCharacter::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
+{
+    if (IsPlayerControlled())
+    {
+        OutLocation = CameraComp->GetComponentLocation();
+        OutRotation = CameraComp->GetComponentRotation();
+        return;
+    }
+
+    Super::GetActorEyesViewPoint(OutLocation, OutRotation);
+}
+
 void ASCharacter::ChangeWeapon()
 {
     if (WeaponComp)

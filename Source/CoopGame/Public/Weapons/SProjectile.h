@@ -36,6 +36,9 @@ public:
 	// Sets default values for this actor's properties
 	ASProjectile();
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
+    UProjectileMovementComponent* MovementComp = nullptr;
+
 protected:
 	AActor* DirectHitActor = nullptr;
 
@@ -45,9 +48,7 @@ protected:
     UFUNCTION()
     void OnRep_bIsServerProjectile();
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components")
-    UProjectileMovementComponent* MovementComp = nullptr;
-
+  
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* MeshComp = nullptr;
 

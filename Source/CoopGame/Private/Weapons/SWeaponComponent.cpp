@@ -11,7 +11,7 @@
 USWeaponComponent::USWeaponComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-    SetIsReplicated(true);
+    SetIsReplicatedByDefault(true);
 }
 
 void USWeaponComponent::BeginPlay()

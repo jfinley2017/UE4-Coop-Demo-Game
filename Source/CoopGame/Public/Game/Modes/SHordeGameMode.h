@@ -24,49 +24,6 @@ public:
 protected:
 	void SpawnPickup(FVector SpawnLoc);
 
-	// Height from ground
-	UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
-	float PickupSpawnHeight = 50.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
-	TSubclassOf<AActor> PickupToSpawnOnDeath = nullptr;
-
-    UPROPERTY(BlueprintReadOnly, Category = "HordeMode")
-    ASHordeGameState* GameStateCache = nullptr;
-
-    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
-    TArray<TSubclassOf<ASAffix>> AllPossibleWaveAffixes;
-
-    TArray<ASAffix*> SpawnedAffixes;
-
-    /** The number of waves designated before the players win the game. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
-    int32 NumberWaves = 1;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
-    int32 NumberBotsPerWave = 6;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
-    uint8 PlayerTeamNumber = 0;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
-    uint8 HordeTeamNumber = 1;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
-    TArray<TSubclassOf<AActor>> HordeUnitTypes;
-
-    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
-    float TimeBetweenWaves = 0.0f;
-
-    /** Counter which displays the current wave count, can be used to adjust wave strength or show players progress when compared to NumberWaves */
-    int32 CurrentWaveCount = 0;
-
-    // Integer used to control how many bots we are spawning in the current wave
-    int32 NumberBotsToSpawn = 0;
-
-    FTimerHandle TimerHandle_BotSpawner;
-    FTimerHandle TimerHandle_NextWaveStart;
-
     // Spawns a bot using the blueprint override
     UFUNCTION(BlueprintImplementableEvent, Category = "GameMode")
     void SpawnNewBot();
@@ -107,5 +64,48 @@ protected:
 
     UFUNCTION(BlueprintCallable, Category = "HordeWaveStateSpawningWoWGreatCategory")
     void ApplyWaveAffixesToActor(AActor* Actor);
+
+    // Height from ground
+    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
+    float PickupSpawnHeight = 50.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
+    TSubclassOf<AActor> PickupToSpawnOnDeath = nullptr;
+
+    UPROPERTY(BlueprintReadOnly, Category = "HordeMode")
+    ASHordeGameState* GameStateCache = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
+    TArray<TSubclassOf<ASAffix>> AllPossibleWaveAffixes;
+
+    TArray<ASAffix*> SpawnedAffixes;
+
+    /** The number of waves designated before the players win the game. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
+    int32 NumberWaves = 1;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
+    int32 NumberBotsPerWave = 6;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
+    uint8 PlayerTeamNumber = 0;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
+    uint8 HordeTeamNumber = 1;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HordeMode")
+    TArray<TSubclassOf<AActor>> HordeUnitTypes;
+
+    UPROPERTY(EditDefaultsOnly, Category = "HordeMode")
+    float TimeBetweenWaves = 0.0f;
+
+    /** Counter which displays the current wave count, can be used to adjust wave strength or show players progress when compared to NumberWaves */
+    int32 CurrentWaveCount = 0;
+
+    // Integer used to control how many bots we are spawning in the current wave
+    int32 NumberBotsToSpawn = 0;
+
+    FTimerHandle TimerHandle_BotSpawner;
+    FTimerHandle TimerHandle_NextWaveStart;
 
 };
