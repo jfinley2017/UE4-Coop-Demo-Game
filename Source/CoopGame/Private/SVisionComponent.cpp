@@ -32,10 +32,21 @@ void USVisionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+    // The owner is a player, players are always visible.
+    APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
+    if (OwnerAsPawn && OwnerAsPawn->GetPlayerState() && !OwnerAsPawn->GetPlayerState()->bIsABot)
+    {
+        bIsVisible = true;
+        OnBecameVisible.Broadcast();
+        SetComponentTickEnabled(false);
+        return;
+    }
+
+    // We are an AI, test to see if any players in the game has LoS on us
     for (APlayerState* Player : GetWorld()->GetGameState()->PlayerArray)
     {
         APawn* PlayerPawn = Player->GetPawn();
-        if (!PlayerPawn)
+        if (!PlayerPawn || Player->bIsABot || Player->bIsSpectator)
         {
             continue;
         }
@@ -57,6 +68,7 @@ void USVisionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
         }
     }
 
+    // No players have LoS on us.
     if (bIsVisible)
     {
         bIsVisible = false;

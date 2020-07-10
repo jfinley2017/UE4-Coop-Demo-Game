@@ -19,6 +19,13 @@ void USOverheadHealthbarComponent::BeginPlay()
 {
     Super::BeginPlay();
 
+    APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
+    if (OwnerAsPawn && OwnerAsPawn->IsLocallyControlled())
+    {
+        SetWidgetVisibility(false);
+        return;
+    }
+
     USVisionComponent* OwnerVisionComponent = GetOwner()->FindComponentByClass<USVisionComponent>();
     if (!OwnerVisionComponent)
     {
@@ -29,4 +36,11 @@ void USOverheadHealthbarComponent::BeginPlay()
     OwnerVisionComponent->OnBecameVisible.AddDynamic(this, &USOverheadHealthbarComponent::NotifyBecameVisible);
     OwnerVisionComponent->OnBecameHidden.AddDynamic(this, &USOverheadHealthbarComponent::NotifyBecameHidden);
 
+    if (OwnerVisionComponent->IsVisible())
+    {
+        NotifyBecameVisible();
+        return;
+    }
+
+    NotifyBecameHidden();
 }
