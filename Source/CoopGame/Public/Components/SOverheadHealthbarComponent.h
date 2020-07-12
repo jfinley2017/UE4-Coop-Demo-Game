@@ -7,7 +7,8 @@
 #include "SOverheadHealthbarComponent.generated.h"
 
 /**
- * 
+ * Healthbar, handles toggling based on vision. 
+ * Assumes owner has a single SVisionComponent attached.
  */
 UCLASS(meta = (BlueprintSpawnableComponent))
 class COOPGAME_API USOverheadHealthbarComponent : public USOverheadWidgetComponent

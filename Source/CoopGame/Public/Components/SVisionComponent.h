@@ -9,6 +9,10 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBecameVisibleSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FBecameHiddenSignature);
 
+/**
+ * Component which handles the "visibility" of the owning actor.
+ * Broadcasts OnBecameVisible when the owner is visible and OnBecameHidden when the owner becomes hidden.
+ */
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class COOPGAME_API USVisionComponent : public UActorComponent
 {
