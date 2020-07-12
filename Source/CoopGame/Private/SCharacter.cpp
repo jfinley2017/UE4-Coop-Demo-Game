@@ -9,7 +9,7 @@
 #include "UnrealNetwork.h"
 #include "SWeaponComponent.h"
 #include "SWeaponWidget.h"
-#include "Gameplay/GameplayComponents/TeamComponent.h"
+#include "TeamComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "UnrealNames.h"
 #include "GameFramework/PlayerState.h"

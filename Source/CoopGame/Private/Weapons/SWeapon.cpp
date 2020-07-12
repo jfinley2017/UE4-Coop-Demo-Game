@@ -4,7 +4,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "SHealthComponent.h"
-#include "Gameplay/GameplayComponents/TeamComponent.h"
+#include "TeamComponent.h"
 #include "SHitIndicatorWidget.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"

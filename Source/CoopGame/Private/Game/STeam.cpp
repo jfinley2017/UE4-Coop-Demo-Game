@@ -2,7 +2,7 @@
 
 #include "STeam.h"
 #include "Net/UnrealNetwork.h"
-#include "Gameplay/GameplayComponents/TeamComponent.h"
+#include "TeamComponent.h"
 #include "GameFramework/Controller.h"
 #include "CoopGame.h"
 #include "Engine/Engine.h"

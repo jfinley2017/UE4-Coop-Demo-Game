@@ -11,7 +11,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Sound/SoundCue.h"
-#include "Gameplay/GameplayComponents/TeamComponent.h"
+#include "TeamComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "TimerManager.h"
 #include "Game/Modes/SGameState.h"

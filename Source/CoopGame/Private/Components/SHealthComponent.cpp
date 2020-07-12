@@ -6,7 +6,7 @@
 #include "CoopGame.h"
 #include "SPlayerState.h"
 #include "Engine/Engine.h"
-#include "Gameplay/GameplayComponents/TeamComponent.h"
+#include "TeamComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
