@@ -65,7 +65,7 @@ void USVisibilityOutlineComponent::TickComponent(float DeltaTime, ELevelTick Tic
         }
     }
 
-    if (CachedSkeletalMeshComponent->bRenderCustomDepth)
+    if (CachedSkeletalMeshComponent && CachedSkeletalMeshComponent->bRenderCustomDepth)
     {
         CachedSkeletalMeshComponent->SetRenderCustomDepth(false);
     }
