@@ -22,7 +22,7 @@ void USVisionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-    bIsVisible = true;
+    bIsVisible = false;
     
 }
 

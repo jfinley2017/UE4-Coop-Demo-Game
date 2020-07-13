@@ -20,7 +20,9 @@ void USOverheadHealthbarComponent::BeginPlay()
     Super::BeginPlay();
 
     APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
-    if (OwnerAsPawn && OwnerAsPawn->IsLocallyControlled())
+
+    bool bIsLocalPlayer = (Cast<APlayerController>(OwnerAsPawn->GetController()) != nullptr) && OwnerAsPawn->IsLocallyControlled();
+    if (OwnerAsPawn && bIsLocalPlayer)
     {
         SetWidgetVisibility(false);
         return;
