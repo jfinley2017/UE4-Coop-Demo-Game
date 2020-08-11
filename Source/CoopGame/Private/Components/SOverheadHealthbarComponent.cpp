@@ -21,6 +21,8 @@ void USOverheadHealthbarComponent::BeginPlay()
 
     APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
 
+    // Hide our own healthbar
+    // Both checks needed, bots are technically locally controlled on some netmodes.
     bool bIsLocalPlayer = (Cast<APlayerController>(OwnerAsPawn->GetController()) != nullptr) && OwnerAsPawn->IsLocallyControlled();
     if (OwnerAsPawn && bIsLocalPlayer)
     {

@@ -7,6 +7,7 @@
 #include "SPlayerState.h"
 #include "Engine/Engine.h"
 #include "TeamComponent.h"
+#include "Services/SDamageNumberService.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -22,6 +23,7 @@ void USHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(USHealthComponent, Health);
     DOREPLIFETIME(USHealthComponent, MaxHealth);
+    DOREPLIFETIME(USHealthComponent, LastDamageTaken);
 }
 
 // Called when the game starts
@@ -61,6 +63,12 @@ void USHealthComponent::HandleTakeDamage(AActor * DamagedActor, float Damage, co
 
     Health = FMath::Clamp(Health - Damage, 0.0f, MaxHealth);
 
+    FDamageContext NewDamageContext;
+    NewDamageContext.Timestamp = GetWorld()->GetTimeSeconds();
+    NewDamageContext.Damage = Damage;
+    NewDamageContext.DamageInstigator = DamageInstigatorActor;
+    NewDamageContext.DamageReceiver = GetOwner();
+
     // @DEBUGLOG Damage 
     FString InstigatedByS = DamageInstigatorActor ? *DamageInstigatorActor->GetName() : NULLSTRING;
     FString DamageCauserS = DamageCauser ? *DamageCauser->GetName() : NULLSTRING;
@@ -71,9 +79,6 @@ void USHealthComponent::HandleTakeDamage(AActor * DamagedActor, float Damage, co
         *DamageCauserS,
         Health);
 
-
-    BroadcastRelevantDamageEvents(DamagedActor, Damage, DamageType, InstigatedBy, DamageInstigatorActor, DamageCauser);
-
     if (Health <= 0 && !bIsDead)
     {
         OnKilled.Broadcast(GetOwner());
@@ -83,10 +88,13 @@ void USHealthComponent::HandleTakeDamage(AActor * DamagedActor, float Damage, co
             GM->OnActorKilled(GetOwner(), DamageInstigatorActor, DamageCauser);
         }
         bIsDead = true;
+        NewDamageContext.DamageTags.Add("Lethal");
     }
 
+    LastDamageTaken = NewDamageContext;
+    OnRep_LastDamageTaken();
 }
-// Run on owning client here i guess to displlay damage numbers?
+
 
 void USHealthComponent::BroadcastRelevantDamageEvents(AActor * DamagedActor, float Damage, const UDamageType * DamageType, AController * InstigatedBy, AActor* DamageInstigatorActor, AActor * DamageCauser)
 {
@@ -101,6 +109,13 @@ void USHealthComponent::BroadcastRelevantDamageEvents(AActor * DamagedActor, flo
             OtherHealthComponent->OnDamageDealt.Broadcast(DamageInstigatorActor, GetOwner(), DamageCauser, Damage);
         }
     }
+
+    ASDamageNumberService* DamageNumberService = ASDamageNumberService::GetDamageNumberService(GetWorld());
+    if (DamageNumberService)
+    {
+        DamageNumberService->DisplayDamageNumber(DamagedActor, DamageInstigatorActor, Damage, LastDamageTaken.DamageTags);
+    }
+
 
     // Update damage and damage taken stats
     APawn* Damaged = Cast<APawn>(GetOwner());
@@ -128,6 +143,17 @@ void USHealthComponent::OnRep_Health(float OldHealth)
 void USHealthComponent::OnRep_MaxHealth()
 {
     OnHealthChanged_Minimal.Broadcast(this);
+}
+
+void USHealthComponent::OnRep_LastDamageTaken()
+{
+    // Determine if damage is valid
+    if (LastDamageTaken.Timestamp < 0.0f && GetWorld()->GetTimeSeconds() - LastDamageTaken.Timestamp >= 5.0f)
+    {
+        return;
+    }
+
+    BroadcastRelevantDamageEvents(LastDamageTaken.DamageReceiver, LastDamageTaken.Damage, nullptr, nullptr, LastDamageTaken.DamageInstigator, nullptr);
 }
 
 void USHealthComponent::Heal(float HealAmount)
