@@ -12,23 +12,6 @@ class USWeaponWidget;
 class ASWeapon;
 class UImage;
 class UTexture2D;
-enum class EAmmoType : uint8;
-
-USTRUCT(BlueprintType)
-struct FWeaponAmmoInventoryItem
-{
-    GENERATED_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Data")
-    EAmmoType AmmoType;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Data")
-    UTexture2D* AmmoImage;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Data")
-    int32 CurrentStackSize = 20;
-
-};
 
 UCLASS(ClassGroup=(COOP), meta=(BlueprintSpawnableComponent))
 class COOPGAME_API USWeaponComponent : public UActorComponent
@@ -64,9 +47,6 @@ public:
     UFUNCTION(BlueprintPure, Category = "WeaponData")
     TArray<ASWeapon*> GetWeaponInventory() { return WeaponInventory; }
 
-    UFUNCTION(BlueprintPure, Category = "WeaponData")
-    TArray<FWeaponAmmoInventoryItem> GetAmmoInventory() { return AmmoInventory; }
-
     UFUNCTION(BlueprintCallable, Category = "PlayerWeapon")
     void StartFire();
 
@@ -91,9 +71,6 @@ protected:
 	// Delay before the weapon is swapped, this should match the animation
 	UPROPERTY(EditDefaultsOnly, Replicated, Category = "Weapon")
 	float ChangeWeaponDelay = 0.17f;
-
-    UPROPERTY(EditDefaultsOnly, Replicated, Category = "Weapon")
-    TArray<FWeaponAmmoInventoryItem> AmmoInventory;
 
     UPROPERTY(BlueprintReadonly, ReplicatedUsing = OnRep_CurrentWeapon)
     ASWeapon* CurrentWeapon;

@@ -4,11 +4,9 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
-
 DECLARE_DELEGATE(FOnWeaponReload);
 DECLARE_DELEGATE(FOnWeaponFire);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponHit, AActor*, HitActor);
-
 
 class UDamageType;
 class UParticleSystem;
@@ -18,14 +16,6 @@ class UImage;
 class USHitIndicatorWidget;
 class UAnimMontage;
 class UBehaviorTree;
-
-UENUM(BlueprintType)
-enum class EAmmoType : uint8
-{
-    Bullet,
-    Grenade, 
-    None
-};
 
 UCLASS()
 class COOPGAME_API ASWeapon : public AActor
@@ -44,11 +34,6 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "Weapon")
     FOnWeaponHit OnWeaponHit;
-
-    ///////////////////////////////////
-    /** Getters/Setters */
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    EAmmoType GetAmmoType() { return AmmoType; }
 
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     UTexture2D* GetWeaponIcon() { return WeaponIcon; }
@@ -156,10 +141,6 @@ protected:
     /** If the weapon has less than this amount in its clip, HasAmmoRequiredToFire will fail */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponFiringData")
     float AmmoRequiredToFire = 1;
-
-    /** The ammo type which this weapon uses */
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponFiringData")
-    EAmmoType AmmoType = EAmmoType::None;
 
     /** The damage type that this weapon causes */
     UPROPERTY(EditDefaultsOnly, Category = "WeaponFiringData")

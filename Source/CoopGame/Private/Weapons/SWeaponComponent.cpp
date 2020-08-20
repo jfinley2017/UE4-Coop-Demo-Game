@@ -25,7 +25,7 @@ void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(USWeaponComponent, AmmoInventory);
+
     DOREPLIFETIME(USWeaponComponent, CurrentWeapon);
 	DOREPLIFETIME(USWeaponComponent, WeaponInventory);
 	DOREPLIFETIME(USWeaponComponent, bCanFire);
