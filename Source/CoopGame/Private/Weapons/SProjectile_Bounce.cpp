@@ -13,7 +13,7 @@ ASProjectile_Bounce::ASProjectile_Bounce()
     MovementComp->Bounciness = 0.6;
 }
 
-void ASProjectile_Bounce::OnProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit)
+void ASProjectile_Bounce::NotifyProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit)
 {
 	if (ExplosionStatus.bExploded)
 	{

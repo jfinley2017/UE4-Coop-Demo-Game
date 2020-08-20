@@ -4,11 +4,6 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
-/**
-Weapon rework goals: 
-1.) New weapons should be createable purely in blueprints
-2.) 
-*/
 
 DECLARE_DELEGATE(FOnWeaponReload);
 DECLARE_DELEGATE(FOnWeaponFire);

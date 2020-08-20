@@ -25,5 +25,5 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "BounceProjectile")
 	float TimeToLiveAfterBounce = 0.2f;
 
-    virtual void OnProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit) override;
+    virtual void NotifyProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit) override;
 };

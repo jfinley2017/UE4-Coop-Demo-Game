@@ -7,7 +7,7 @@
 #include "SPlayerState.h"
 #include "Engine/Engine.h"
 #include "TeamComponent.h"
-#include "Services/SDamageNumberService.h"
+#include "Services/DamageNumbers/SDamageNumberService.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -34,126 +34,59 @@ void USHealthComponent::BeginPlay()
     // Only perform if we are the server
     if (GetOwnerRole() == ROLE_Authority)
     {
-        AActor* Owner = GetOwner();
-        if (Owner)
-        {
-            Owner->OnTakeAnyDamage.AddDynamic(this, &USHealthComponent::HandleTakeDamage);
-        }
         Health = MaxHealth;
-        OnHealthChanged.Broadcast(this, Health, 0, nullptr, nullptr, nullptr);
+        OnRep_Health();
     }
 }
 
-// This only runs on server because we are only binding to this delegate on server
-void USHealthComponent::HandleTakeDamage(AActor * DamagedActor, float Damage, const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser)
+bool USHealthComponent::ShouldApplyDamage(const FSDamageInstance& Damage)
 {
     ASGameMode* GM = Cast<ASGameMode>(GetWorld()->GetAuthGameMode());
-
-    // Find the ACTOR responsible for the damage which was dealt
-    // Why all the trouble? Controllers don't stay attached to pawns on death, thus on occasion InstigatedBy->GetPawn is invalid
-    AActor* DamageInstigatorActor = DetermineDamageInstigatorActor(InstigatedBy, DamageCauser);
-
-    if ( Damage <= 0 
-        || bIsDead 
-        || (!(DamageCauser == DamageInstigatorActor) && !GM->bIsFriendlyFireEnabled && UTeamComponent::IsActorFriendly(DamagedActor, DamageInstigatorActor))
-        || (!bDamageSelf && DamageCauser == DamageInstigatorActor))
-    {
-        return;
-    }
-
-    Health = FMath::Clamp(Health - Damage, 0.0f, MaxHealth);
-
-    FDamageContext NewDamageContext;
-    NewDamageContext.Timestamp = GetWorld()->GetTimeSeconds();
-    NewDamageContext.Damage = Damage;
-    NewDamageContext.DamageInstigator = DamageInstigatorActor;
-    NewDamageContext.DamageReceiver = GetOwner();
-
-    // @DEBUGLOG Damage 
-    FString InstigatedByS = DamageInstigatorActor ? *DamageInstigatorActor->GetName() : NULLSTRING;
-    FString DamageCauserS = DamageCauser ? *DamageCauser->GetName() : NULLSTRING;
-    TRACE("%s inflicts %f damage on %s using %s . Current Health: %f",
-        *InstigatedByS, 
-        Damage, 
-        *GetOwner()->GetName(), 
-        *DamageCauserS,
-        Health);
-
-    if (Health <= 0 && !bIsDead)
-    {
-        OnKilled.Broadcast(GetOwner());
-        if (GM && DamageInstigatorActor && GetOwner())
-        {
-            TRACE("%s", *DamageCauser->GetName());
-            GM->OnActorKilled(GetOwner(), DamageInstigatorActor, DamageCauser);
-        }
-        bIsDead = true;
-        NewDamageContext.DamageTags.Add("Lethal");
-    }
-
-    LastDamageTaken = NewDamageContext;
-    OnRep_LastDamageTaken();
+    bool bIsFriendlyFire = UTeamComponent::IsActorFriendly(Damage.Instigator.Get(), Damage.Receiver.Get());
+    bool bIsLegalFriendlyFire =  !bIsFriendlyFire || (bIsFriendlyFire && GM->bIsFriendlyFireEnabled) || Damage.ContextTags.Contains("Suicide");
+    bool bIsDamage = Damage.Damage >= 0.0f;
+    return bIsLegalFriendlyFire && bIsDamage;
 }
 
-
-void USHealthComponent::BroadcastRelevantDamageEvents(AActor * DamagedActor, float Damage, const UDamageType * DamageType, AController * InstigatedBy, AActor* DamageInstigatorActor, AActor * DamageCauser)
+void USHealthComponent::BroadcastDamageEvents(const FSDamageInstance& DamageTaken)
 {
-    OnHealthChanged.Broadcast(this, Health, Damage, DamageType, InstigatedBy, DamageCauser);
+    OnDamageTaken.Broadcast(DamageTaken);
+
+    if (DamageTaken.ContextTags.Contains("Lethal"))
+    {
+        OnDied.Broadcast(DamageTaken);
+    }
 
     // Tell the other actor that it successfully applied damage
-    if (DamageInstigatorActor)
+    if (DamageTaken.Instigator.Get())
     {
-        USHealthComponent* OtherHealthComponent = DamageInstigatorActor->FindComponentByClass<USHealthComponent>();
+        USHealthComponent* OtherHealthComponent = DamageTaken.Instigator.Get()->FindComponentByClass<USHealthComponent>();
         if (OtherHealthComponent)
         {
-            OtherHealthComponent->OnDamageDealt.Broadcast(DamageInstigatorActor, GetOwner(), DamageCauser, Damage);
+            OtherHealthComponent->OnDamageDealt.Broadcast(DamageTaken);
         }
     }
 
     ASDamageNumberService* DamageNumberService = ASDamageNumberService::GetDamageNumberService(GetWorld());
     if (DamageNumberService)
     {
-        DamageNumberService->DisplayDamageNumber(DamagedActor, DamageInstigatorActor, Damage, LastDamageTaken.DamageTags);
+        DamageNumberService->DisplayDamageNumber(DamageTaken.Receiver.Get(), DamageTaken.Instigator.Get(), DamageTaken.Damage, LastDamageTaken.ContextTags);
     }
 
-
     // Update damage and damage taken stats
-    APawn* Damaged = Cast<APawn>(GetOwner());
-    APawn* Damager = Cast<APawn>(DamageInstigatorActor);
+    APawn* Damaged = Cast<APawn>(DamageTaken.Receiver.Get());
+    APawn* Damager = Cast<APawn>(DamageTaken.Receiver.Get());
     if (Damaged && Damaged->GetPlayerState())
     {
         ASPlayerState* PS = Cast<ASPlayerState>(Damaged->GetPlayerState());
-        PS->AddDamageTaken(Damage);
+        PS->AddDamageTaken(DamageTaken.Damage);
     }
 
     if (Damager && Damager->GetPlayerState())
     {
         ASPlayerState* PS = Cast<ASPlayerState>(Damager->GetPlayerState());
-        PS->AddDamage(Damage);
+        PS->AddDamage(DamageTaken.Damage);
     }
-}
-
-void USHealthComponent::OnRep_Health(float OldHealth)
-{
-    float Damage = OldHealth - Health;
-    TRACE("%s Health changed. Current Health: %f. Damage: %f", *GetOwner()->GetName(), Health, Damage);
-    OnHealthChanged.Broadcast(this, Health, Damage, nullptr, nullptr, nullptr);
-}
-
-void USHealthComponent::OnRep_MaxHealth()
-{
-    OnHealthChanged_Minimal.Broadcast(this);
-}
-
-void USHealthComponent::OnRep_LastDamageTaken()
-{
-    // Determine if damage is valid
-    if (LastDamageTaken.Timestamp < 0.0f && GetWorld()->GetTimeSeconds() - LastDamageTaken.Timestamp >= 5.0f)
-    {
-        return;
-    }
-
-    BroadcastRelevantDamageEvents(LastDamageTaken.DamageReceiver, LastDamageTaken.Damage, nullptr, nullptr, LastDamageTaken.DamageInstigator, nullptr);
 }
 
 void USHealthComponent::Heal(float HealAmount)
@@ -163,25 +96,58 @@ void USHealthComponent::Heal(float HealAmount)
         return;
     }
 
-    TRACE("%s healed for %f hp.", *GetOwner()->GetName(), HealAmount);
     Health = FMath::Clamp(Health + HealAmount, 0.0f, MaxHealth);
-    OnHealthChanged.Broadcast(this, Health, -HealAmount, nullptr, nullptr, nullptr);
+    OnHealthChanged.Broadcast(this, Health, MaxHealth);
 }
 
-// Attempts to find an actor responsible for the damage caused
-AActor* USHealthComponent::DetermineDamageInstigatorActor(AController* DamageInstigator, AActor* DamageCauser)
+bool USHealthComponent::ApplyDamage(FSDamageInstance Damage)
 {
-    if (DamageInstigator && DamageInstigator->GetPawn())
+    if (!ShouldApplyDamage(Damage))
     {
-        return DamageInstigator->GetPawn();
+        return false;
     }
-    else if (DamageCauser && DamageCauser->GetOwner())
+
+    ASGameMode* GM = Cast<ASGameMode>(GetWorld()->GetAuthGameMode());
+
+    float DamageAmount = Damage.Damage;
+    Health = FMath::Clamp(Health - DamageAmount, 0.0f, MaxHealth);
+    OnRep_Health();
+
+    if (Health <= 0 && !bIsDead)
     {
-         return DamageCauser->GetOwner();
+        bIsDead = true;
+        Damage.ContextTags.Add("Lethal");
+
+        OnDied.Broadcast(Damage);
+        if (GM && Damage.Instigator.Get() && GetOwner())
+        {
+            GM->OnActorKilled(GetOwner(), Damage.Instigator.Get(), nullptr);
+        }
     }
-    else
+
+    LastDamageTaken = Damage;
+    OnRep_LastDamageTaken();
+
+    return true;
+}
+
+void USHealthComponent::OnRep_Health()
+{
+    OnHealthChanged.Broadcast(this,Health, MaxHealth);
+}
+
+void USHealthComponent::OnRep_MaxHealth()
+{
+    OnHealthChanged.Broadcast(this, Health, MaxHealth);
+}
+
+void USHealthComponent::OnRep_LastDamageTaken()
+{
+    // Determine if damage is valid
+    if (LastDamageTaken.Timestamp < 0.0f || GetWorld()->GetTimeSeconds() - LastDamageTaken.Timestamp >= 5.0f)
     {
-        // Occasionally the actor responsible is the actor itself (the case in any suicidal units)
-        return DamageCauser;
+        return;
     }
+
+    BroadcastDamageEvents(LastDamageTaken);
 }

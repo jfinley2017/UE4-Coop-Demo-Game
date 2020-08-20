@@ -21,7 +21,10 @@ public:
 	ASTrackerBot();
 
 protected:
+
+    // AActor
 	virtual void BeginPlay() override;
+    // ~AActor
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UStaticMeshComponent* MeshComp = nullptr;
@@ -39,8 +42,7 @@ protected:
     UMaterialInstanceDynamic* MatInstance = nullptr;
 
     UFUNCTION()
-    void OnTakeDamage(USHealthComponent * ChangedHealthComp, float Health, float HealthDelta, 
-    const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser);
+    void NotifyHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float MaxHealth);
 
     UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
     float ExplosionRadius = 200;

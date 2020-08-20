@@ -23,12 +23,12 @@ void USGlowOnHitComponent::BeginPlay()
 		return;
 	}
 
-	HealthComp->OnHealthChanged.AddDynamic(this, &USGlowOnHitComponent::OnHealthChanged);
+	HealthComp->OnHealthChanged.AddDynamic(this, &USGlowOnHitComponent::NotifyHealthChanged);
 }
 
-void USGlowOnHitComponent::OnHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float HealthDelta, const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser)
+void USGlowOnHitComponent::NotifyHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float MaxHealth)
 {
-
+    float HealthDelta = OldHealth - Health;
 	FColor GlowColor = HealthDelta > 0 ? HitGlowColor : HealGlowColor;
 
 	FlashGlow(GetWorld()->TimeSeconds, GlowColor, 5.0f);

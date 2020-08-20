@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "DamageDealer.h"
 #include "Game/SPawn.h"
+#include "Library/SDamageTypes.h"
 #include "SCharacter.generated.h"
 
 class UCameraComponent;
@@ -146,14 +147,11 @@ protected:
     bool bDied = false;
 
 	UFUNCTION()
-	void OnRep_bDied();
-
-	// Override to set player glows, won't work if other team also has player controlled SCharacters
-	virtual void OnRep_PlayerState() override;
+	void NotifyDied(const FSDamageInstance& Damage);
 
     /** Hook to be called when this unit takes damage */
     UFUNCTION()
-    void OnHealthChanged(USHealthComponent* ChangedHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
+    void NotifyHealthChanged(USHealthComponent* ChangedHealthComp, float Health, float MaxHealth);
     
     //////////////////////////////
     /** Action functions */ 
@@ -182,4 +180,11 @@ protected:
     /** RPC to tell the server that we intend to zoom in */
     UFUNCTION(Server, Unreliable, WithValidation)
     void ServerSetZoom(bool bZoom);
+
+    UFUNCTION()
+    void OnRep_bDied();
+
+    // Override to set player glows, won't work if other team also has player controlled SCharacters
+    virtual void OnRep_PlayerState() override;
+
 };

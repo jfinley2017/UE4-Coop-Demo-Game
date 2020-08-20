@@ -69,7 +69,7 @@ protected:
     virtual void Explode();
 
     UFUNCTION()
-    virtual void OnProjectileHit(AActor* SelfActor, AActor* OtherActor, FVector NormalImpulse, const FHitResult& Hit);
+    virtual void NotifyProjectileHit(AActor* SelfActor, AActor* OtherActor, FVector NormalImpulse, const FHitResult& Hit);
 
 	/** Deal damage and play effects for a direct hit */
 	virtual void DirectHit();

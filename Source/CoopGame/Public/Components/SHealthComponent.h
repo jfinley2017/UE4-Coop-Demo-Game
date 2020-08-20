@@ -4,35 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Library/SDamageTypes.h"
 #include "SHealthComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, USHealthComponent*, HealthComponent);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_SixParams(FOnHealthChangedSignature, USHealthComponent*, HealthComp, float, Health, float, HealthDelta, const class UDamageType*, DamageType, class AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDamageTakenSignature, const FSDamageInstance&, Damage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDamageDealtSignature, const FSDamageInstance&, Damage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDiedSignature, const FSDamageInstance&, Damage);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnKilled, AActor*, KilledActor);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnDealtDamage, AActor*, DamageDealer, AActor*, DamageReciever, AActor*, DamageCauser, float, Damage);
-
-USTRUCT(BlueprintType)
-struct FDamageContext
-{
-    GENERATED_BODY()
-    
-    UPROPERTY(BlueprintReadOnly)
-    float Timestamp;
-    
-    UPROPERTY(BlueprintReadOnly)
-    float Damage;
-
-    UPROPERTY(BlueprintReadOnly)
-    AActor* DamageInstigator;
-
-    UPROPERTY(BlueprintReadOnly)
-    AActor* DamageReceiver;
-
-    UPROPERTY(BlueprintReadOnly)
-    TArray<FString> DamageTags;
-    
-};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnHealthChangedSignature, USHealthComponent*, HealthComp, float, Health, float, MaxHealth);
 
 UCLASS( ClassGroup=(COOP), meta=(BlueprintSpawnableComponent) )
 class COOPGAME_API USHealthComponent : public UActorComponent
@@ -41,66 +20,84 @@ class COOPGAME_API USHealthComponent : public UActorComponent
 
 public:	
 
-    UPROPERTY(BlueprintAssignable, Category = "HealthComponent")
-    FOnHealthChanged OnHealthChanged_Minimal;
-
+    /**
+     * Fired whenever the health value of this component changes.
+     */
     UPROPERTY(BlueprintAssignable, Category = "HealthComponentEvents")
     FOnHealthChangedSignature OnHealthChanged;
 
-    UPROPERTY(BlueprintAssignable, Category = "DamageEventDelegates")
-    FOnKilled OnKilled;
+    /**
+     * Fired whenever this component has died, typically health <= 0.
+     */
+    UPROPERTY(BlueprintAssignable, Category = "HealthComponent")
+    FOnDiedSignature OnDied;
+   
+    /**
+     * Fired whenever this component applied damage.
+     */
+    UPROPERTY(BlueprintAssignable, Category = "HealthComponent")
+    FOnDamageDealtSignature OnDamageDealt;
 
-    UPROPERTY(BlueprintAssignable, Category = "DamageEventDelegates")
-    FOnDealtDamage OnDamageDealt;
+    /**
+     * Fired whenever this component took damage.s
+     */
+    UPROPERTY(BlueprintAssignable, Category = "HealthComponent")
+    FOnDamageTakenSignature OnDamageTaken;
 
 	// Sets default values for this component's properties
 	USHealthComponent();
 
-    /** Should the actor which this component is attached to be allowed to damage itself? */
-    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadOnly, Category = "HealthComponent")
-    bool bDamageSelf = true;
-
+    /**
+     * Heals this HealthComponent, HealAmount must be > 0
+     */
     UFUNCTION(BlueprintCallable, Category = "HealthComponent")
     void Heal(float HealAmount);
+    
+    UFUNCTION()
+    bool ApplyDamage(FSDamageInstance Damage);
 
-    UFUNCTION(BlueprintCallable, Category = "HealthComponent")
+    UFUNCTION(BlueprintPure, Category = "HealthComponent")
     float GetHealth() const { return Health; }
 
+    
 protected:
 
     // UActorComponent
 	virtual void BeginPlay() override;
     // ~UActorComponent
 
-    UPROPERTY(ReplicatedUsing=OnRep_Health, BlueprintReadWrite, Category = "HealthComponent")
+    /**
+     * Determines whether or not we should apply the specified damage instance to ourselves.
+     */
+    UFUNCTION()
+    bool ShouldApplyDamage(const FSDamageInstance& Damage);
+
+    UFUNCTION()
+    void BroadcastDamageEvents(const FSDamageInstance& DamageTaken);
+
+    UPROPERTY(ReplicatedUsing = OnRep_Health, BlueprintReadWrite, Category = "HealthComponent")
     float Health;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_MaxHealth, Category = "HealthComponent")
     float MaxHealth = 100.0f;
+
+    UPROPERTY(ReplicatedUsing = OnRep_LastDamageTaken, BlueprintReadWrite, Category = "HealthComponent")
+    FSDamageInstance LastDamageTaken;
     
-    UPROPERTY(ReplicatedUsing=OnRep_LastDamageTaken, BlueprintReadWrite, Category = "HealthComponent")
-    FDamageContext LastDamageTaken;
+    bool bIsDead = false;
+
+    /**
+     * Should the actor which this component is attached to be allowed to damage itself?
+     */
+    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadOnly, Category = "HealthComponent")
+    bool bDamageSelf = true;
 
     UFUNCTION()
-    void HandleTakeDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
-
-    UFUNCTION()
-    void BroadcastRelevantDamageEvents(AActor * DamagedActor, float Damage, const UDamageType * DamageType, AController * InstigatedBy, AActor* DamageInstigatorActor, AActor * DamageCauser);
-
-    UFUNCTION()
-    void OnRep_Health(float OldHealth);
+    void OnRep_Health();
 
     UFUNCTION()
     void OnRep_MaxHealth();
 
     UFUNCTION()
     void OnRep_LastDamageTaken();
-
-    bool bIsDead = false;
-
-    /** Used to determine who is responsible for damage. 
-        Basically just picks one of DamageInstigator->GetPawn(), DamagerCauser->GetOwner(), DamageCauser based on which is valid
-        trying each in that order. */
-    AActor * DetermineDamageInstigatorActor(AController * DamageInstigator, AActor * DamageCauser);
-    
 };

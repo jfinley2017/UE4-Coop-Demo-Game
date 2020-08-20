@@ -48,7 +48,10 @@ class COOPGAME_API ASHitscanWeapon : public ASWeapon
 public:
 
     ASHitscanWeapon();
+
+    // AActor 
     virtual void Tick(float DeltaTime) override;
+    // ~AActor
 
 protected:
     
@@ -88,12 +91,8 @@ protected:
     float CurrentYawOffset = 0.0f;
     float CurrentPitchOffset = 0.0f;
 
-
     /** The time at which the current Consecutive Shot Modifiers are no longer valid and should be ignored */
     FTimerHandle TH_RecoilReset;
-
-    UFUNCTION()
-    void RecoilExpired();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
     UParticleSystem* DefaultImpactEffect = nullptr;
@@ -113,12 +112,11 @@ protected:
     UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
     FName TracerTargetName = "Target";
 
-    /** Normally used to display effects (muzzle, tracer, impact, etc) */
-    UFUNCTION()
-    void OnRep_HitScanTrace();
-
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void ApplyRecoil();
+
+    UFUNCTION()
+    void RecoilExpired();
 
     /** Fires off a hitscan shot, optionally doing damage and draining ammo*/
     UFUNCTION(BlueprintCallable, Category = "Weapon")
@@ -132,5 +130,9 @@ protected:
 
     /** Draws the impact effects for this weapon */
     void PlayImpactEffect(EPhysicalSurface SurfaceType, FVector ImpactPoint);
+
+    /** Normally used to display effects (muzzle, tracer, impact, etc) */
+    UFUNCTION()
+    void OnRep_HitScanTrace();
 
 };

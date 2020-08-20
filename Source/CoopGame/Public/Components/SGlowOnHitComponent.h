@@ -38,8 +38,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GlowComp")
 	FColor HealGlowColor;
 
+    UPROPERTY()
+    float OldHealth = 0.0f;
+
 	UFUNCTION()
-	void OnHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float HealthDelta, const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser);
+	void NotifyHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float MaxHealth);
 
 	UFUNCTION(BlueprintCallable, Category = "GlowComp")
 	void FlashGlow(float TimeSeconds = 0.1f, FColor GlowColor = FColor::White, float Intensity = 0.0f);

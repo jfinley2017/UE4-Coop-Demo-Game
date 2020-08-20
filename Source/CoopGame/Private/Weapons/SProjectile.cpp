@@ -11,6 +11,7 @@
 #include "Net/UnrealNetwork.h"
 #include "SWeapon.h"
 #include "TimerManager.h"
+#include "Library/SDamageLibrary.h"
 
 ASProjectile::ASProjectile()
 {
@@ -51,15 +52,6 @@ void ASProjectile::Initialize(const FProjectileWeaponData &Data, bool bIsServer,
     
 }
 
-void ASProjectile::OnRep_bIsServerProjectile()
-{
-    if (bIsServerProjectile && !HasAuthority() && GetInstigator()->IsLocallyControlled())
-    {
-        SetActorHiddenInGame(true);
-        SetActorEnableCollision(false);
-    }
-}
-
 void ASProjectile::Launch()
 {
     if (!bWasInitialized)
@@ -67,7 +59,7 @@ void ASProjectile::Launch()
         UE_LOG(LogTemp, Error, TEXT("Projectile fired despite not being Initialized. Please Initialze projectile. Undefined behavior incoming."))
     }
 
-    OnActorHit.AddDynamic(this, &ASProjectile::OnProjectileHit);
+    OnActorHit.AddDynamic(this, &ASProjectile::NotifyProjectileHit);
 
     if (WeaponData.DoesExpire())
     {
@@ -83,7 +75,7 @@ void ASProjectile::OnProjectileExpire()
 	
 }
 
-void ASProjectile::OnProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit)
+void ASProjectile::NotifyProjectileHit(AActor * SelfActor, AActor * OtherActor, FVector NormalImpulse, const FHitResult & Hit)
 {
 	if (OtherActor == Instigator || (OtherActor && OtherActor->GetOwner() == Instigator))
 	{
@@ -125,8 +117,13 @@ void ASProjectile::DirectHit()
 
 		AController* InstigatorController = Instigator ? Instigator->GetController() : nullptr;
 
-		UGameplayStatics::ApplyDamage(DirectHitActor, DirectDamage,
-			InstigatorController, GetOwner(), WeaponData.ProjectileDamageType);
+        FSDamageInstance NewDamageInstance;
+        NewDamageInstance.Damage = DirectDamage;
+        NewDamageInstance.Instigator = GetOwner();
+        NewDamageInstance.Receiver = DirectHitActor;
+        NewDamageInstance.Timestamp = GetWorld()->GetTimeSeconds();
+        NewDamageInstance.ContextTags.Add("CriticalHit");
+        USDamageLibrary::DealDamage(NewDamageInstance);
 	}
 }
 
@@ -185,4 +182,13 @@ void ASProjectile::OnRep_Exploded()
         return;
     }
     Explode();
+}
+
+void ASProjectile::OnRep_bIsServerProjectile()
+{
+    if (bIsServerProjectile && !HasAuthority() && GetInstigator()->IsLocallyControlled())
+    {
+        SetActorHiddenInGame(true);
+        SetActorEnableCollision(false);
+    }
 }

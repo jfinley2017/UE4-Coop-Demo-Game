@@ -11,6 +11,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "DamageDealer.h"
+#include "Library/SDamageLibrary.h"
 
 
 ASHitscanWeapon::ASHitscanWeapon()
@@ -29,9 +30,6 @@ void ASHitscanWeapon::Tick(float DeltaTime)
     APawn* OwningPawn = Cast<APawn>(GetOwner());
     if (OwningPawn)
     {
-        // Why in the heavens is this done here you may ask?
-        // 1.) You can'y addyawinput in PC tick!
-        // 2.) You don't need to cast to a specific player controller to get this to work
         APlayerController* PC = Cast<APlayerController>(OwningPawn->GetController());
 
         if (PC)
@@ -157,6 +155,12 @@ void ASHitscanWeapon::OnTraceHit(FHitResult Hit, FVector ShotDirection, bool bDo
     // Calculate and apply damage for this shot
     if (bDoDamage)
     {
+        FSDamageInstance NewDamageInstance;
+        NewDamageInstance.Instigator = GetOwner();
+        NewDamageInstance.Receiver = HitActor;
+        NewDamageInstance.Timestamp = GetWorld()->GetTimeSeconds();
+        NewDamageInstance.DamageDealer = this;
+
         // Better way of doing this in the future, maybe ensure that owners are damage dealers
         IDamageDealer* DamageDealer = Cast<IDamageDealer>(GetOwner());
         // Calculate damage multiplier
@@ -170,9 +174,12 @@ void ASHitscanWeapon::OnTraceHit(FHitResult Hit, FVector ShotDirection, bool bDo
         if (SurfaceType == SURFACE_FLESHVULNERABLE)
         {
             ActualDamage *= HeadshotBonus;
+            NewDamageInstance.ContextTags.Add("CriticalHit");
+            NewDamageInstance.ContextTags.Add("Headshot");
         }
 
-        UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, ShotDirection, Hit, Owner->GetInstigatorController(), this, DamageType);
+        NewDamageInstance.Damage = ActualDamage;
+        USDamageLibrary::DealDamage(NewDamageInstance);
     }
 }
 

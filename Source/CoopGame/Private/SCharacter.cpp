@@ -15,6 +15,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
+#include "Library/SDamageTypes.h"
 
 ASCharacter::ASCharacter()
 {
@@ -68,6 +69,31 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
     PlayerInputComponent->BindAction("WeaponSwap", IE_Pressed, this, &ASCharacter::ChangeWeapon);
 }
 
+
+void ASCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+
+    FVector TargetCameraPosition = bWantsToZoom ? ZoomedCameraPosition : DefaultCameraPosition;
+    FVector NewPosition = FMath::VInterpTo(CameraComp->RelativeLocation, TargetCameraPosition, DeltaTime, ZoomInterpSpeed);
+    CameraComp->SetRelativeLocation(NewPosition, false);
+
+
+    float TargetFOV = bWantsToZoom ? ZoomedFOV : DefaultFOV;
+    float NewFOV = FMath::FInterpTo(CameraComp->FieldOfView, TargetFOV, DeltaTime, ZoomInterpSpeed);
+    CameraComp->SetFieldOfView(NewFOV);
+
+}
+
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ASCharacter, bDied);
+    DOREPLIFETIME_CONDITION(ASCharacter, bWantsToZoom, COND_SkipOwner);
+}
+
 void ASCharacter::AddControllerPitchInput(float Val)
 {
 	Super::AddControllerPitchInput(Val * MouseSensitivity);
@@ -76,14 +102,6 @@ void ASCharacter::AddControllerPitchInput(float Val)
 void ASCharacter::AddControllerYawInput(float Val)
 {
 	Super::AddControllerYawInput(Val * MouseSensitivity);
-}
-
-void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-    DOREPLIFETIME(ASCharacter, bDied);
-	DOREPLIFETIME_CONDITION(ASCharacter, bWantsToZoom, COND_SkipOwner);
 }
 
 void ASCharacter::BeginPlay()
@@ -101,7 +119,8 @@ void ASCharacter::BeginPlay()
 		GetMesh()->SetMaterial(0, MatInstance);
 	}
 
-    HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
+    HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::NotifyHealthChanged);
+    HealthComp->OnDied.AddDynamic(this, &ASCharacter::NotifyDied);
 }
 
 void ASCharacter::OnRep_bDied()
@@ -121,22 +140,6 @@ void ASCharacter::OnRep_PlayerState()
 		GetMesh()->SetRenderCustomDepth(true);
 		GetMesh()->SetCustomDepthStencilValue(0);
 	}
-}
-
-void ASCharacter::Tick(float DeltaTime)
-{
-    Super::Tick(DeltaTime);
-
-
-    FVector TargetCameraPosition = bWantsToZoom ? ZoomedCameraPosition : DefaultCameraPosition;
-    FVector NewPosition = FMath::VInterpTo(CameraComp->RelativeLocation, TargetCameraPosition, DeltaTime, ZoomInterpSpeed);
-    CameraComp->SetRelativeLocation(NewPosition, false);
-
-
-    float TargetFOV = bWantsToZoom ? ZoomedFOV : DefaultFOV;
-    float NewFOV = FMath::FInterpTo(CameraComp->FieldOfView, TargetFOV, DeltaTime, ZoomInterpSpeed);
-    CameraComp->SetFieldOfView(NewFOV);
-
 }
 
 void ASCharacter::MoveForward(float RelativeSpeed)
@@ -235,36 +238,40 @@ void ASCharacter::DisableInput(APlayerController* PlayerController)
 	StopFire();
 }
 
-void ASCharacter::OnHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float HealthDelta, const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser)
+void ASCharacter::NotifyDied(const FSDamageInstance& Damage)
 {
-    if (Health <= 0.0f && !bDied)
+    bDied = true;
+    if (HasAuthority())
     {
-        bDied = true;
-		if (HasAuthority())
-		{
-			OnRep_bDied();
-		}
-
-        StopFire();
-
-        // Die
-        GetMovementComponent()->StopMovementImmediately();
-
-        APlayerController* PC = Cast<APlayerController>(GetController());
-
-        if (PC)
-        {
-            PC->PlayerState->bIsSpectator = true;
-            PC->ChangeState(NAME_Spectating);
-            PC->ClientGotoState(NAME_Spectating);
-        }
-
-        GetMesh()->SetCollisionResponseToAllChannels(ECR_Ignore);
-        GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        DetachFromControllerPendingDestroy();
-        PrimaryActorTick.bCanEverTick = false;
-        SetLifeSpan(3.0f);
+        OnRep_bDied();
     }
+
+    StopFire();
+    DetachFromControllerPendingDestroy();
+
+    // Die
+    GetMovementComponent()->StopMovementImmediately();
+    GetCharacterMovement()->DisableMovement();
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+
+    if (PC)
+    {
+        PC->PlayerState->bIsSpectator = true;
+        PC->ChangeState(NAME_Spectating);
+        PC->ClientGotoState(NAME_Spectating);
+    }
+
+
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    
+    PrimaryActorTick.bCanEverTick = false;
+    SetLifeSpan(3.0f);
+}
+
+void ASCharacter::NotifyHealthChanged(USHealthComponent* ChangedHealthComp, float Health, float MaxHealth)
+{
+
 }
 
 /** This is empty for now, but the hook remains in case something like stuns appear */

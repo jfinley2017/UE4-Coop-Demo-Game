@@ -16,6 +16,7 @@
 #include "TimerManager.h"
 #include "Game/Modes/SGameState.h"
 #include "Net/UnrealNetwork.h"
+#include "SDamageLibrary.h"
 
 static int32 DebugTrackerBot = 0;
 FAutoConsoleVariableRef CVARDebugTrackerBot(
@@ -35,7 +36,7 @@ ASTrackerBot::ASTrackerBot()
     RootComponent = MeshComp;
 
     HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("Health Component"));
-    HealthComp->OnHealthChanged.AddDynamic(this, &ASTrackerBot::OnTakeDamage);
+    HealthComp->OnHealthChanged.AddDynamic(this, &ASTrackerBot::NotifyHealthChanged);
     
     TeamComp = CreateDefaultSubobject<UTeamComponent>(TEXT("Team Component"));
 
@@ -155,8 +156,7 @@ void ASTrackerBot::RefreshPath()
 	NextPathPoint = GetNextPathPoint();
 }
 
-void ASTrackerBot::OnTakeDamage(USHealthComponent * ChangedHealthComp, float Health, float HealthDelta, 
-    const UDamageType * DamageType, AController * InstigatedBy, AActor * DamageCauser)
+void ASTrackerBot::NotifyHealthChanged(USHealthComponent * ChangedHealthComp, float Health, float MaxHealth)
 {
     if (Health <= 0)
     {
@@ -173,15 +173,24 @@ void ASTrackerBot::SelfDestruct()
 
     if (Role == ROLE_Authority)
     {
-        TArray<AActor*> IgnoredActors = { };
+        TArray<AActor*> IgnoredActors = {this};
         
 		float ActualDamage = ((GetDamageModifier() / 100) * ExplosionDamage) + ExplosionDamage;
 		bool bScaleDamageByDistance = bBotAttachesToPlayer;
 
-        UGameplayStatics::ApplyRadialDamage(this, ActualDamage, GetActorLocation(), ExplosionRadius,nullptr, IgnoredActors,this,GetController(), bScaleDamageByDistance);
-        // Kill ourselves
-        UGameplayStatics::ApplyDamage(this, HealthComp->GetHealth(), GetController(), this, nullptr);
-        
+      
+        USDamageLibrary::ApplyRadialDamage(this, GetActorLocation(), ExplosionRadius, IgnoredActors, ActualDamage, this, nullptr, TArray<FString>());
+
+        FSDamageInstance NewDamageInstance;
+        NewDamageInstance.Damage = HealthComp->GetHealth();
+        NewDamageInstance.DamageDealer = this;
+        NewDamageInstance.Instigator = this;
+        NewDamageInstance.Receiver = this;
+        NewDamageInstance.Timestamp = GetWorld()->GetTimeSeconds();
+        NewDamageInstance.ContextTags.Add("Suicide");
+        USDamageLibrary::DealDamage(NewDamageInstance);
+
+
         // Give clients a chance to play effects
         SetLifeSpan(4.0);
     }
