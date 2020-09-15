@@ -31,7 +31,7 @@ void ASGameMode::GameOver(ASTeam* WinningTeam)
     {
         GS->MulticastGameOver(WinningTeam);
     }
-    OnGameOver(WinningTeam);
+    OnGameOver(true);
 }
 
 // Respawns dead players

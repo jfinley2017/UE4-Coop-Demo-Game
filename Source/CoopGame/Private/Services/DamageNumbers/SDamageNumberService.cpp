@@ -22,7 +22,7 @@ void ASDamageNumberService::BeginPlay()
 
     if (!ShouldRunDamageService())
     {
-        Destroy(this);
+        Destroy();
         return;
     }
 

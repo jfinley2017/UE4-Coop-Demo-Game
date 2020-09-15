@@ -194,7 +194,8 @@ void ASCharacter::StartFire()
 {
     if (WeaponComp)
     {
-        WeaponComp->StartFire();
+        FString StartFireErrorMessage;
+        WeaponComp->TryStartFire(StartFireErrorMessage);
     }
 }
 
@@ -202,7 +203,8 @@ void ASCharacter::StopFire()
 {
     if (WeaponComp)
     {
-        WeaponComp->StopFire();
+        FString StopFireErrorMessage;
+        WeaponComp->TryStopFire(StopFireErrorMessage);
     }
 }
 
@@ -227,7 +229,8 @@ void ASCharacter::ChangeWeapon()
 {
     if (WeaponComp)
     {
-        WeaponComp->ChangeWeapon();
+        FString TryChangeWeaponErrorMessage;
+        WeaponComp->TryChangeWeapon(TryChangeWeaponErrorMessage);
     }
 }
 

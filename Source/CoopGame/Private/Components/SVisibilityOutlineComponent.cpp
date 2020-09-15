@@ -43,7 +43,7 @@ bool USVisibilityOutlineComponent::IsOwnerPlayer()
     APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
     if (OwnerAsPawn)
     {
-        return OwnerAsPawn->GetPlayerState();
+        return OwnerAsPawn->GetPlayerState() != nullptr;
     }
 
     return false;

@@ -11,7 +11,7 @@
 
 void ASProjectileWeapon::SpawnProjectile(TSubclassOf<ASProjectile> Projectile, bool bAttemptPrediction, TArray<AActor*> IgnoredActors)
 {
-    if (!bAttemptPrediction && !HasAuthority()) { return; }
+    if (!HasAuthority()) { return; }
 
     if (Projectile && GetOwner())
     {
@@ -47,7 +47,8 @@ void ASProjectileWeapon::SpawnProjectile(TSubclassOf<ASProjectile> Projectile, b
 
         // This is a hack to hide server-spawned projectiles in a predicted environment
         // Without this, the client who instigated the projectile will see two projectiles rather than one.
-        bool bHideFromClient = bAttemptPrediction && HasAuthority() && GetInstigator()->IsPlayerControlled();
+        bool bHideFromClient = false;
+         //bAttemptPrediction&& HasAuthority() && GetInstigator()->IsPlayerControlled();
 
 
         NewProjectile->Initialize(ProjectileWeaponConfigData, bHideFromClient, IgnoredActors);

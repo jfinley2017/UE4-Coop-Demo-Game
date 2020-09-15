@@ -12,6 +12,7 @@ USWeaponComponent::USWeaponComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
     SetIsReplicatedByDefault(true);
+    CurrentWeapon = nullptr;
 }
 
 void USWeaponComponent::BeginPlay()
@@ -25,10 +26,26 @@ void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-
     DOREPLIFETIME(USWeaponComponent, CurrentWeapon);
 	DOREPLIFETIME(USWeaponComponent, WeaponInventory);
-	DOREPLIFETIME(USWeaponComponent, bCanFire);
+
+}
+
+USWeaponWidget* USWeaponComponent::DrawWeaponWidget(APlayerController* OwningController, int32 NumberWeaponSlots)
+{
+    if (OwningController)
+    {
+        WeaponWidget = CreateWidget<USWeaponWidget>(OwningController, WeaponsWidgetClass);
+
+        if (WeaponWidget)
+        {
+            WeaponWidget->InitializeWeaponWidget(this, NumberWeaponSlots);
+            return WeaponWidget;
+        }
+    }
+
+    UE_LOG(LogTemp, Error, TEXT("DrawWeaponWidget called without owning controller, this is confusing"));
+    return nullptr;
 }
 
 void USWeaponComponent::SpawnDefaultWeaponInventory()
@@ -54,9 +71,9 @@ void USWeaponComponent::SpawnDefaultWeaponInventory()
 
         if (WeaponInventory.Num() > 0)
         {
-            EquipWeapon(WeaponInventory[0]);
+            ServerEquipWeapon(WeaponInventory[0]);
         }
-        
+
         if (!IsRunningDedicatedServer())
         {
             OnRep_WeaponInventory();
@@ -64,209 +81,201 @@ void USWeaponComponent::SpawnDefaultWeaponInventory()
     }
 }
 
-// Only want to SetCurrentWeapon on the server
-void USWeaponComponent::EquipWeapon(ASWeapon* Weapon)
+bool USWeaponComponent::TryStartFire(FString& CanFireErrorMessage)
 {
-	if (CurrentWeapon)
-	{
-		CurrentWeapon->OnReload.Unbind();
-		CurrentWeapon->OnWeaponFire.Unbind();
-		CurrentWeapon->SetActorHiddenInGame(true);
-	}
-
-	Weapon->OnWeaponFire.BindLambda([&]() {
-		MulticastFireAnim();
-		UE_LOG(LogTemp, Error, TEXT("bound fire"));
-	});
-
-	// Proxy our current weapon's reload delegate
-	Weapon->OnReload.BindLambda([&]() {
-		MulticastReloadAnim();
-	});
-
-    Weapon->WeaponActivated();
-
-    if (!GetOwner()->HasAuthority())
+    if (!CanFire(CanFireErrorMessage))
     {
-        ServerEquipWeapon(Weapon);
-        return;
+        return false;
     }
 
-    SetCurrentWeapon(Weapon);
+    ServerFire();
+    CanFireErrorMessage = "";
+    return true;
 }
 
-void USWeaponComponent::ServerChangeWeaponAnim_Implementation()
+bool USWeaponComponent::TryStopFire(FString& CanStopFireErrorMessage)
 {
-    MulticastChangeWeaponAnim();
+    ServerStopFire();
+    CanStopFireErrorMessage = "";
+    return true;
 }
 
-bool USWeaponComponent::ServerChangeWeaponAnim_Validate() { return true; }
-
-
-
-void USWeaponComponent::ServerEquipWeapon_Implementation(ASWeapon* Weapon)
+bool USWeaponComponent::TryReload(FString& ErrorMessage)
 {
-    EquipWeapon(Weapon);
+    ServerReload();
+    return true;
 }
 
-bool USWeaponComponent::ServerEquipWeapon_Validate(ASWeapon* Weapon) { return true; }
+bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
+{
+    if (!CanChangeWeapon(OutErrorMessage))
+    {
+        return false;
+    }
 
+    int32 CurrentWeaponIndex = WeaponInventory.Find(CurrentWeapon);
+    if (CurrentWeaponIndex == WeaponInventory.Num() - 1)
+    {
+        ServerEquipWeapon(WeaponInventory[0]);
+    }
+    else if (CurrentWeaponIndex != INDEX_NONE)
+    {
+        CurrentWeaponIndex++;
+        ServerEquipWeapon(WeaponInventory[CurrentWeaponIndex]);
+    }
 
-void USWeaponComponent::ChangeWeapon()
+    OutErrorMessage = "";
+    return true;
+}
+
+bool USWeaponComponent::CanFire(FString& OutErrorMessage)
+{
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    if (CachedCurrentWeapon)
+    {
+        return GetCurrentWeapon()->CanFire(OutErrorMessage);
+    }
+
+    OutErrorMessage = "NoCurrentWeapon";
+    return false;
+}
+
+bool USWeaponComponent::CanChangeWeapon(FString& OutErrorReason)
 {
     if (WeaponInventory.Num() == 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("Failed: WeaponInventoryEmpty"));
+        OutErrorReason = "InventoryEmpty";
+        return false;
+    }
+
+    return true;
+
+}
+
+void USWeaponComponent::ServerFire_Implementation()
+{
+    FString CanFireErrorMessage;
+    if (!CanFire(CanFireErrorMessage))
+    {
         return;
     }
 
-    OnWeaponChange.Broadcast();
-    ServerChangeWeaponAnim();
-
-    bCanFire = false;
-    ServerSetCanFire(false);
-
-    FTimerHandle Handle;
-    GetWorld()->GetTimerManager().SetTimer(Handle, [&]() {
-        bCanFire = true;
-        ServerSetCanFire(true);
-
-        if (!CurrentWeapon)
-        {
-            UE_LOG(LogTemp, Log, TEXT("No Current Weapon, Equipping First"));
-            EquipWeapon(WeaponInventory[0]);
-        }
-        else
-        {
-            UE_LOG(LogTemp, Log, TEXT("WeaponSwap Success"));
-            GetCurrentWeapon()->CancelReload();
-            StopFire();
-            int32 CurrentWeaponIndex = WeaponInventory.Find(CurrentWeapon);
-            if (CurrentWeaponIndex == WeaponInventory.Num() - 1)
-            {
-                EquipWeapon(WeaponInventory[0]);
-            }
-            else if (CurrentWeaponIndex != INDEX_NONE)
-            {
-                CurrentWeaponIndex++;
-                EquipWeapon(WeaponInventory[CurrentWeaponIndex]);
-            }
-        }
-    }, ChangeWeaponDelay, false);
-}
-
-
-void USWeaponComponent::ServerSetCanFire_Implementation(bool bCan)
-{
-	bCanFire = bCan;
-}
-
-bool USWeaponComponent::ServerSetCanFire_Validate(bool bCan) { return true; }
-
-void USWeaponComponent::SetCurrentWeapon(ASWeapon* Weapon)
-{
-    if (Weapon)
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    if (CachedCurrentWeapon)
     {
-        Weapon->SetActorHiddenInGame(false);
-        CurrentWeapon = Weapon;
+        CachedCurrentWeapon->StartFire();
+    }
 
-        USkeletalMeshComponent* OwningMesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
-        CurrentWeapon->AttachToComponent(OwningMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocket);
+    return;
+}
 
-		if (Weapon->GetAmmoInClip() <= 0)
-		{
-			Weapon->Reload();
-		}
+bool USWeaponComponent::ServerFire_Validate()
+{
+    return true;
+}
+
+void USWeaponComponent::ServerStopFire_Implementation()
+{
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    if (CachedCurrentWeapon)
+    {
+        CachedCurrentWeapon->StopFire();
     }
 }
 
-void USWeaponComponent::OnRep_CurrentWeapon()
+bool USWeaponComponent::ServerStopFire_Validate()
 {
-    SetCurrentWeapon(CurrentWeapon);
+    return true;
+}
+
+void USWeaponComponent::ServerReload_Implementation()
+{
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    if (CachedCurrentWeapon)
+    {
+        CachedCurrentWeapon->Reload();
+    }
+}
+
+bool USWeaponComponent::ServerReload_Validate()
+{
+    return true;
+}
+
+void USWeaponComponent::ServerEquipWeapon_Implementation(ASWeapon* Weapon)
+{
+    if (Weapon == nullptr)
+    {
+        return;
+    }
+
+    FString StopFireErrorMessage;
+    TryStopFire(StopFireErrorMessage);
+
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    CurrentWeapon = Weapon;
+    OnRep_CurrentWeapon(CachedCurrentWeapon);
+
+}
+
+bool USWeaponComponent::ServerEquipWeapon_Validate(ASWeapon* Weapon)
+{
+    return true;
+}
+
+void USWeaponComponent::SetupWeapon(ASWeapon* Weapon)
+{
+
+    USkeletalMeshComponent* OwningMesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+    CurrentWeapon->AttachToComponent(OwningMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocket);
+
+    if (Weapon)
+    {
+        Weapon->WeaponActivated();
+    }
+}
+
+void USWeaponComponent::UnsetupWeapon(ASWeapon* Weapon)
+{
+    if (Weapon)
+    {
+        Weapon->WeaponDeactivated();
+    }
+}
+
+
+ASWeapon* USWeaponComponent::GetCurrentWeapon()
+{
+    return CurrentWeapon;
+}
+
+TArray<ASWeapon*> USWeaponComponent::GetWeaponInventory()
+{
+    return WeaponInventory;
+}
+
+
+void USWeaponComponent::OnRep_CurrentWeapon(ASWeapon* LastEquippedWeapon)
+{
+    UnsetupWeapon(LastEquippedWeapon);
+    SetupWeapon(CurrentWeapon);
+    OnWeaponChange.Broadcast();
 }
 
 void USWeaponComponent::OnRep_WeaponInventory()
 {
-	for (ASWeapon* W : WeaponInventory)
-	{
-		if (!W)
-		{
-			return;
-		}
-	}
-
-	if (WeaponWidget)
-	{
-		WeaponWidget->RefreshWeapons();
-	}
-}
-
-
-bool USWeaponComponent::IsLocallyControlled()
-{
-	ACharacter* MyCharacter = Cast<ACharacter>(GetOwner());
-	return MyCharacter ? MyCharacter->IsLocallyControlled() : false;
-}
-
-void USWeaponComponent::MulticastFireAnim_Implementation()
-{
-
-	UE_LOG(LogTemp, Error, TEXT("onweaponfire"));
-	OnWeaponFire.Broadcast();
-}
-
-
-bool USWeaponComponent::MulticastFireAnim_Validate() { return true; }
-
-void USWeaponComponent::MulticastReloadAnim_Implementation()
-{
-	OnReload.Broadcast();
-}
-
-bool USWeaponComponent::MulticastReloadAnim_Validate()
-{
-	return true;
-}
-
-void USWeaponComponent::MulticastChangeWeaponAnim_Implementation()
-{
-	if (!IsLocallyControlled())
-	{
-		OnWeaponChange.Broadcast();
-	}
-}
-
-bool USWeaponComponent::MulticastChangeWeaponAnim_Validate() { return true; }
-
-void USWeaponComponent::StartFire()
-{
-    if (CurrentWeapon && bCanFire)
+    for (ASWeapon* Weapon : WeaponInventory)
     {
-        CurrentWeapon->StartFire();
-    }
-}
-
-void USWeaponComponent::StopFire()
-{
-    if (CurrentWeapon)
-    {
-        CurrentWeapon->StopFire();
-    }
-}
-
-USWeaponWidget* USWeaponComponent::DrawWeaponWidget(APlayerController* OwningController, int32 NumberWeaponSlots)
-{
-    if (OwningController)
-    {
-        WeaponWidget = CreateWidget<USWeaponWidget>(OwningController,WeaponsWidgetClass);
-    
-		if (WeaponWidget)
-		{
-			WeaponWidget->InitializeWeaponWidget(this, NumberWeaponSlots);
-			return WeaponWidget;
-		}
+        if (!Weapon)
+        {
+            return;
+        }
     }
 
-	UE_LOG(LogTemp, Error, TEXT("DrawWeaponWidget called without owning controller, this is confusing"));
-	return nullptr;
+    OnWeaponInventoryUpdated.Broadcast();
+
+    if (WeaponWidget)
+    {
+        WeaponWidget->RefreshWeapons();
+    }
 }

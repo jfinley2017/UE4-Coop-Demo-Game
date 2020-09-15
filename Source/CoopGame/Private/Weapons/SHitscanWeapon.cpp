@@ -94,7 +94,7 @@ void ASHitscanWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
     DOREPLIFETIME(ASHitscanWeapon, AmmoInClip);
-    DOREPLIFETIME_CONDITION(ASHitscanWeapon, HitScanTrace, COND_SkipOwner);
+    DOREPLIFETIME(ASHitscanWeapon, HitScanTrace);
 }
 
 

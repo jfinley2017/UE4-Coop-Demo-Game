@@ -53,8 +53,9 @@ void ASWeapon::BeginPlay()
 
 void ASWeapon::WeaponActivated()
 {
+    SetActorHiddenInGame(false);
     UGameplayStatics::PlaySoundAtLocation(GetWorld(), WeaponActivatedSound, GetActorLocation());
-	
+
 	// Set the firing behavior in the AI Controller. This tree should be ran whenever one wishes for the AI to fire.
     // Allows for complex firing behavior
     // In the future, I'd really like to have firing behavior encapsulated in a task like setting which is different for each weapon
@@ -75,12 +76,15 @@ void ASWeapon::WeaponActivated()
 
 void ASWeapon::WeaponDeactivated()
 {
+    SetActorHiddenInGame(true);
+
     OnWeaponDeactivated();
 }
 
 void ASWeapon::StartFire()
 {
-    if (!CanFire() || GetWorldTimerManager().IsTimerActive(TimerHandle_TimeBetweenShots)) { return; }
+    FString CanFireErrorMessage;
+    if (!CanFire(CanFireErrorMessage) || GetWorldTimerManager().IsTimerActive(TimerHandle_TimeBetweenShots)) { return; }
 
     // If this weapon has fired prior to us attempting to start fire
     float FirstDelay = FMath::Max(LastFireTime + TimeBetweenShots - GetWorld()->TimeSeconds, 0.0f);
@@ -88,7 +92,8 @@ void ASWeapon::StartFire()
 	// Timer used with lambda to avoid creation of a function which is seemingly in the same scope as StartFire()
 	GetWorldTimerManager().SetTimer(TimerHandle_TimeBetweenShots, [&]()
 	{
-        if (!CanFire())
+        FString CanFireErrorMessage;
+        if (!CanFire(CanFireErrorMessage))
         {
             StopFire();
             return;
@@ -137,15 +142,16 @@ void ASWeapon::ServerFire_Implementation()
 bool ASWeapon::ServerFire_Validate() { return true; }
 
 
-bool ASWeapon::CanFire()
+bool ASWeapon::CanFire(FString& OutErrorMessage)
 {
     // Reload the weapon if this check fails
-    if (HasAmmoRequiredToFire(true))
+    if (!HasAmmoRequiredToFire(true))
     {
-        return true;
+        OutErrorMessage = "NO_AMMO";
+        return false;
     }
 
-    return false;
+    return true;
 }
 
 bool ASWeapon::HasAmmoRequiredToFire(bool bReloadIfFalse)

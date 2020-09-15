@@ -54,7 +54,7 @@ public:
 
     /** Should be overridden if a particular weapon requires any special cases to be true in order for it to begin firing */
     UFUNCTION(BlueprintCallable, Category = "Weapon")
-    bool CanFire();
+    virtual bool CanFire(FString& OutErrorMessage);
 
     /** Checks to see if AmmoInClip <= AmmoRequiredToFire, returns false if so. Optionally reloads the weapon if there is not enough ammo */
     UFUNCTION(BlueprintCallable, Category = "Weapon")
