@@ -25,6 +25,27 @@ class UTexture2D;
 //////////////////////////////////////////////////////////////////////////
 
 
+USTRUCT()
+struct FSReplicatedAnimMontageInfo
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    UAnimMontage* Montage = nullptr;
+
+    UPROPERTY()
+    bool bStopPlaying = false;
+
+    UPROPERTY()
+    uint8 ForceReplicationByte = 1;
+
+    void ForceReplication()
+    {
+        ForceReplicationByte = (ForceReplicationByte + 1) % 255;
+    }
+
+};
+
 /**
  * 
  */
@@ -77,6 +98,13 @@ public:
     virtual bool TryReload(FString& ErrorMessage);
 
     /**
+     * Attempts to cancel reloading the currently equipped weapon. Can silently fail, safe to call even 
+     * if the current weapon is not reloading.
+     */
+    UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
+    virtual void CancelReload();
+
+    /**
      * Attempts to change the currently equipped weapon. Can fail for a variety of reasons.
      * In multiplayer games where the executor is not the authority, this may result in a false positive.
      * @param ErrorMessage - context as to why we couldn't change weapons, empty if successfully changing weapons.
@@ -84,6 +112,12 @@ public:
      */
     UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
     virtual bool TryChangeWeapon(FString& OutErrorMessage);
+
+    /**
+     * Plays a montage, handling replication. 
+     */
+    UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
+    virtual void PlayMontage(UAnimMontage* MontageToPlay);
 
     UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
     USWeaponWidget* DrawWeaponWidget(APlayerController* OwningController, int32 NumberWeaponSlots);
@@ -119,6 +153,12 @@ protected:
     UFUNCTION()
     virtual bool CanChangeWeapon(FString& OutErrorReason);
 
+    UFUNCTION()
+    virtual void SetupWeapon(ASWeapon* Weapon);
+
+    UFUNCTION()
+    virtual void UnsetupWeapon(ASWeapon* Weapon);
+
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerFire();
 
@@ -129,38 +169,44 @@ protected:
     void ServerReload();
 
     UFUNCTION(Server, Reliable, WithValidation)
-    void ServerEquipWeapon(ASWeapon* Weapon);
+    void ServerCancelReload();
 
     UFUNCTION()
-    virtual void SetupWeapon(ASWeapon* Weapon);
+    void EquipWeapon(ASWeapon* Weapon);
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerChangeWeapon();
 
     UFUNCTION()
-    virtual void UnsetupWeapon(ASWeapon* Weapon);
+    void ChangeWeapon();
 
-    UPROPERTY(VisibleDefaultsOnly, Category = "Player")
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerPlayMontage(UAnimMontage* Animation);
+
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
+    UAnimMontage* WeaponSwapMontage = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
     FName WeaponSocket = "WeaponSocket";
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon", meta = (ExposeOnSpawn = true))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WeaponComponent|Data")
     TArray<TSubclassOf<ASWeapon>> DefaultWeapons;
+
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
+    TSubclassOf<USWeaponWidget> WeaponsWidgetClass = nullptr;
+
+    UPROPERTY(ReplicatedUsing = OnRep_ReplicatedAnimationInfo)
+    FSReplicatedAnimMontageInfo ReplicatedAnimationInfo;
 
     UPROPERTY(ReplicatedUsing = OnRep_WeaponInventory)
     TArray<ASWeapon*> WeaponInventory;
 
-    // Delay before the weapon is swapped, this should match the animation
-    UPROPERTY(EditDefaultsOnly, Replicated, Category = "Weapon")
-    float ChangeWeaponDelay = 0.17f;
-
-    UPROPERTY(BlueprintReadonly, ReplicatedUsing = OnRep_CurrentWeapon)
+    UPROPERTY(ReplicatedUsing = OnRep_CurrentWeapon)
     ASWeapon* CurrentWeapon;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-    TSubclassOf<USWeaponWidget> WeaponsWidgetClass = nullptr;
+    FTimerHandle TimerHandle_WeaponSwapTimer;
 
-    // WeaponComp manages this, because there are things outside the weapon's control
-    // which cause it to not be allowed to fire - like switching weapons
-    UPROPERTY(VisibleAnywhere, Replicated, Category = "Weapon")
-    bool bCanFire = true;
-
+    // Get rid of
     USWeaponWidget* WeaponWidget = nullptr;
 
     UFUNCTION()
@@ -168,5 +214,8 @@ protected:
 
     UFUNCTION()
     void OnRep_WeaponInventory();
+
+    UFUNCTION()
+    void OnRep_ReplicatedAnimationInfo();
 
 };

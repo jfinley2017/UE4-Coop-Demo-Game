@@ -49,6 +49,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "PlayerWeapon")
     void StopFire();
 
+    UFUNCTION()
+    void Reload();
+
     void ChangeWeapon();
 
     /* Override so that we can stop firing when disabled */
@@ -166,6 +169,9 @@ protected:
 
     void BeginSprint();
     void EndSprint();
+
+
+
 
     UFUNCTION(BlueprintCallable, Category = "PlayerActions")
     bool CanSprint();

@@ -41,11 +41,11 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+    // Movement
     PlayerInputComponent->BindAxis("MoveForward", this, &ASCharacter::MoveForward);
     PlayerInputComponent->BindAxis("MoveRight", this, &ASCharacter::MoveRight);
     PlayerInputComponent->BindAxis("LookUp", this, &ASCharacter::AddControllerPitchInput);
     PlayerInputComponent->BindAxis("Turn", this, &ASCharacter::AddControllerYawInput);
-
     PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &ASCharacter::BeginSprint);
     PlayerInputComponent->BindAction("Sprint", IE_Released, this, &ASCharacter::EndSprint);
     PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &ASCharacter::BeginCrouch);
@@ -54,18 +54,10 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
     PlayerInputComponent->BindAction("Zoom", IE_Pressed, this, &ASCharacter::BeginZoom);
     PlayerInputComponent->BindAction("Zoom", IE_Released, this, &ASCharacter::EndZoom);
 
-	FInputActionBinding ReloadPressedAB("Reload", IE_Pressed);
-
-	ReloadPressedAB.ActionDelegate.GetDelegateForManualSet().BindLambda([&]()
-	{
-		WeaponComp->GetCurrentWeapon()->Reload();
-	});
-
-	PlayerInputComponent->AddActionBinding(ReloadPressedAB);
-
+    // Weapons
     PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &ASCharacter::StartFire);
     PlayerInputComponent->BindAction("Fire", IE_Released, this, &ASCharacter::StopFire);
-
+    PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &ASCharacter::Reload);
     PlayerInputComponent->BindAction("WeaponSwap", IE_Pressed, this, &ASCharacter::ChangeWeapon);
 }
 
@@ -205,6 +197,15 @@ void ASCharacter::StopFire()
     {
         FString StopFireErrorMessage;
         WeaponComp->TryStopFire(StopFireErrorMessage);
+    }
+}
+
+void ASCharacter::Reload()
+{
+    if (WeaponComp)
+    {
+        FString ReloadErrorMessage;
+        WeaponComp->TryReload(ReloadErrorMessage);
     }
 }
 

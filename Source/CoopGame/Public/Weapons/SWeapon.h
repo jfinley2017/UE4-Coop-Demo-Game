@@ -4,10 +4,6 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
-DECLARE_DELEGATE(FOnWeaponReload);
-DECLARE_DELEGATE(FOnWeaponFire);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponHit, AActor*, HitActor);
-
 class UDamageType;
 class UParticleSystem;
 class USoundCue;
@@ -16,193 +12,258 @@ class UImage;
 class USHitIndicatorWidget;
 class UAnimMontage;
 class UBehaviorTree;
+class USWeaponComponent;
 
+USTRUCT()
+struct FSWeaponOwnerInfo
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TWeakObjectPtr<APawn> OwnerAsPawn;
+
+    UPROPERTY()
+    TWeakObjectPtr<USkeletalMeshComponent> OwningSkeletalMeshComponent;
+
+    UPROPERTY()
+    TWeakObjectPtr<USWeaponComponent> OwningWeaponComponent;
+};
+
+/**
+ * 
+ */
 UCLASS()
 class COOPGAME_API ASWeapon : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
+
 	ASWeapon();
 
+    // AActor
     virtual void BeginPlay() override;
-
-    ///////////////////////////////////
-    /** Event Delegates */
-	FOnWeaponReload OnReload;
-	FOnWeaponFire OnWeaponFire;
-
-    UPROPERTY(BlueprintAssignable, Category = "Weapon")
-    FOnWeaponHit OnWeaponHit;
-
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    UTexture2D* GetWeaponIcon() { return WeaponIcon; }
-
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    float GetAmmoInClip() { return AmmoInClip; }
-
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    float GetClipSize() { return ClipSize; }
-
-    ///////////////////////////////////
-    /** Current Weapon State Variables */
-    UPROPERTY(Replicated, BlueprintReadOnly, Category = "Weapon")
-    bool bIsReloading;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponFiringData")
-    float TimeToReload = 1.5f;
-
-    /** Should be overridden if a particular weapon requires any special cases to be true in order for it to begin firing */
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    virtual bool CanFire(FString& OutErrorMessage);
-
-    /** Checks to see if AmmoInClip <= AmmoRequiredToFire, returns false if so. Optionally reloads the weapon if there is not enough ammo */
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    bool HasAmmoRequiredToFire(bool bReloadIfFase = false);
-
-    ///////////////////////////////////
-    /** Weapon Actions */
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    virtual void Reload();
-
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
-    virtual void CancelReload();
-
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    // ~AActor
+    
+    /**
+     * Notifys the weapon that the owner wishes to begin firing.
+     */
+    UFUNCTION()
     virtual void StopFire();
 
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    /**
+     * Notifys the weapon that the owner wishes to stop firing.
+     */
+    UFUNCTION()
     virtual void StartFire();
 
-    /** Normally called when the weapon has become active (through changing weapon, etc)*/
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    /**
+     * Notifys the weapon that the owner wishes to reload.
+     */
+    UFUNCTION()
+    virtual void Reload();
+    
+    /**
+     * Notifys the weapon that the owner wishes to cancel the ongoing reload (if any).
+     */
+    UFUNCTION()
+    virtual void CancelReload();
+
+    /**
+     * Determines whether or not the weapon can begin firing based on numerous weapon-specific conditions
+     * @param OutErrorMessage - context as to why we couldn't fire, empty if we can currently fire.
+     * @ret - true if we can currently fire
+     */
+    UFUNCTION()
+    virtual bool CanFire(FString& OutErrorMessage);
+
+    /**
+     * Notifys the weapon that it has become active, eg the owner is actively wielding it.
+     */
+    UFUNCTION()
     virtual void WeaponActivated();
 
-    /** Normally called when the weapon */
-    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    /**
+     * Notifys the weapon that it has become inactive, eg the owner is not actively wielding it.
+     */
+    UFUNCTION()
     virtual void WeaponDeactivated();
 
-    // primary used to dispay hit markers, should be bound to a delegate somewhere perhaps if it needs to be accessed outside of
-    // this class, rather than being public
-    virtual void OnHit(AActor* HitActor, bool bSkipCheck = false);
+    UFUNCTION(BlueprintCallable)
+    UTexture2D* GetWeaponIcon() { return WeaponIcon; }
+
+    UFUNCTION(BlueprintCallable)
+    float GetAmmoInClip() { return AmmoInClip; }
+
+    UFUNCTION(BlueprintCallable)
+    float GetClipSize() { return ClipSize; }
 
 protected:
 
-    ///////////////////////////////////
-    /** Weapon Actions */
+    /**
+     * Loop body for firing the weapon. 
+     */
+    UFUNCTION()
+    virtual void FireLoop();
 
-	/*UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	UAnimMontage* HipFireAnimation;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
-	UAnimMontage* ADSFireAnimation;*/
-
-    /** Handles replication of firing, calls OnFire. Rather than overriding this, one should override OnFire */
+    /**
+     * Actually fires the weapon. 
+     */
+    UFUNCTION()
     virtual void Fire();
-    UFUNCTION(Server, Reliable, WithValidation)
-    void ServerFire();
-
-    /** Blueprint hook for Fire */
-    UFUNCTION(BlueprintImplementableEvent, Category = "Firing")
-    void OnFire();
-	
-    /** Blueprint-based hook to allow AI to know how to use this weapon */
-    UFUNCTION(BlueprintNativeEvent, Category = "Firing")
-    void AIFire();
-
-    UFUNCTION(Server, Reliable, WithValidation)
-    void ServerReload();
-
-    UFUNCTION(Server, Reliable, WithValidation)
-    void ServerCancelReload();
-
-    /** Ammo mutator, use negative values to give ammo */
-    UFUNCTION(Server, Reliable, WithValidation)
+    
+    /**
+     * Consumes the amount of ammo specified by @AmmoToConsume. Negative values will instead give ammo.
+     * @param AmmoToConsume - The ammo to take away, if negative it will instead give ammo.
+     */
+    UFUNCTION()
     void ConsumeAmmo(float AmmoToConsume);
 
-    /** Blueprint hook for WeaponActivated */
-    UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
-    void OnWeaponActivated();
+    /** 
+     * Checks to see if AmmoInClip <= AmmoRequiredToFire, returns false if so. Optionally reloads the weapon if there is not enough ammo. 
+     */
+    UFUNCTION()
+    bool HasAmmoRequiredToFire(bool bReloadIfFase = false);
 
-    /** Blueprint hook for WeaponDeactivated */
-    UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
-    void OnWeaponDeactivated();
-	
-    ///////////////////////////////////
+    /**
+     * Returns whether or not this weapon is reloading.
+     */
+    UFUNCTION()
+    bool IsReloading();
+
+    /**
+     * Hook invoked after a reload animation has finished.
+     */
+    UFUNCTION()
+    virtual void FinishReload();
+
+    /**
+     * Refreshes the owner info associated with this weapon to be based off of @InOwner
+     */
+    UFUNCTION()
+    void RefreshOwnerInfo(AActor* InOwner);
+
+    /**
+     * Information about our owner, helpful to prevent casting over and over for a 
+     * reference to pawn/skeletalmesh/etc
+     */
+    UPROPERTY()
+    FSWeaponOwnerInfo OwnerInfo;
+
+    /** 
+     * Blueprint-based hook to allow AI to know how to use this weapon 
+     */
+    UFUNCTION(BlueprintNativeEvent)
+    void AIFire();
+
+    //////////////////////////////////////////////////////////////////////////
+    // Turn into data table?
+
     /** General Weapon Data */
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     UBehaviorTree* AIFiringBehavior = nullptr;
 
-    ///////////////////////////////////
-    /** General Weapon Data */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-    USkeletalMeshComponent* MeshComp = nullptr;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
+    UAnimMontage* ReloadAnimation = nullptr;
 
     /** If the weapon has less than this amount in its clip, HasAmmoRequiredToFire will fail */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     float AmmoRequiredToFire = 1;
 
     /** The damage type that this weapon causes */
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     TSubclassOf<UDamageType> DamageType;
 
     /** The cooldown period between firing events */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     float TimeBetweenShots = 0.5f;
 
     /** Ammount of ammo that is consumed when fire is successfully called */
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     float AmmoConsumedPerFire = 1;
 
     /** The maximum amount of ammo carried in a clip */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponFiringData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     float ClipSize = 20.0f;
 
     /** Sound played when weapon is swapped/otherwise becomes active */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     USoundCue* WeaponActivatedSound = nullptr;
 
     /** Sound played during reload */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
 	USoundCue* ReloadSound = nullptr;
 
     /** Specifies the socket on @MeshComp where things like muzzle flashes should play */
-    UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
+    UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     FName MuzzleSocketName = "MuzzleSocket";
 
     /** Effect to be played on fire at @MuzzleSocketName's location */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     UParticleSystem* MuzzleEffect = nullptr;
 
     /** The sound a weapon makes when fired */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponEffectData")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WeaponData")
     USoundCue* FireSound = nullptr;
 
     /** The image used to represent this weapon */
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponEffectData")
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     UTexture2D* WeaponIcon = nullptr;
 
-    /** Widget reference displayed when this weapon hits something */
-    USHitIndicatorWidget* HitIndicatorWidget = nullptr;
-
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponEffectData")
+    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     TSubclassOf<USHitIndicatorWidget> HitIndicatorWidgetClass;   
+
+    // ~ turn into data table
+    //////////////////////////////////////////////////////////////////////////
 
     ///////////////////////////////////
     /** Instance variables */
-    /** The current amount of ammo in our clip, if this number is less than AmmoRequiredToFire, HasAmmoRequiredToFire will fail */
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    USkeletalMeshComponent* MeshComp = nullptr;
+
+     /** Widget reference displayed when this weapon hits something */
+    USHitIndicatorWidget* HitIndicatorWidget = nullptr;
+
+    /** 
+     * The current amount of ammo in our clip, if this number is less than AmmoRequiredToFire, HasAmmoRequiredToFire will fail 
+     */
     UPROPERTY(Replicated)
     float AmmoInClip = ClipSize;
 
-    /** Timer used repeat firing events (eg when mouse is held down) */
-    FTimerHandle TimerHandle_TimeBetweenShots;
+    /** 
+     * Timer used to run looping fire effects
+     */
+    FTimerHandle TimerHandle_FireLoop;
 
-    /** The last time this weapon has fired */
-    UPROPERTY(BlueprintReadWrite, Category = "WeaponInstanceVariabes")
+    /** 
+     * The last time this weapon has fired. Clients will have a client-side version of this which
+     * may be different than the servers.
+     */
+    UPROPERTY()
     float LastFireTime = -9999999;
 
-    /** The timer tracking how much time is remaining for a successful reload operation */
-	FTimerHandle TimerHandle_ReloadTimer;
+    /** 
+     * Timer driving a reload.
+     */
+	FTimerHandle TimerHandle_Reload;
 
+    /** 
+     * Blueprint hook for weapon firing.
+     */
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveFire();
+
+    /** 
+     * Blueprint hook for WeaponActivated. 
+     */
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveWeaponActivated();
+
+    /** 
+     * Blueprint hook for WeaponDeactivated. 
+     */
+    UFUNCTION(BlueprintImplementableEvent)
+    void ReceiveWeaponDeactivated();
 
 };

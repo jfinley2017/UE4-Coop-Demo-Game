@@ -28,6 +28,7 @@ void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
     DOREPLIFETIME(USWeaponComponent, CurrentWeapon);
 	DOREPLIFETIME(USWeaponComponent, WeaponInventory);
+    DOREPLIFETIME(USWeaponComponent, ReplicatedAnimationInfo);
 
 }
 
@@ -71,7 +72,7 @@ void USWeaponComponent::SpawnDefaultWeaponInventory()
 
         if (WeaponInventory.Num() > 0)
         {
-            ServerEquipWeapon(WeaponInventory[0]);
+            EquipWeapon(WeaponInventory[0]);
         }
 
         if (!IsRunningDedicatedServer())
@@ -102,8 +103,16 @@ bool USWeaponComponent::TryStopFire(FString& CanStopFireErrorMessage)
 
 bool USWeaponComponent::TryReload(FString& ErrorMessage)
 {
+    FString OutStopFireErrorMessage;
+    TryStopFire(OutStopFireErrorMessage);
+
     ServerReload();
     return true;
+}
+
+void USWeaponComponent::CancelReload()
+{
+    ServerCancelReload();
 }
 
 bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
@@ -113,17 +122,7 @@ bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
         return false;
     }
 
-    int32 CurrentWeaponIndex = WeaponInventory.Find(CurrentWeapon);
-    if (CurrentWeaponIndex == WeaponInventory.Num() - 1)
-    {
-        ServerEquipWeapon(WeaponInventory[0]);
-    }
-    else if (CurrentWeaponIndex != INDEX_NONE)
-    {
-        CurrentWeaponIndex++;
-        ServerEquipWeapon(WeaponInventory[CurrentWeaponIndex]);
-    }
-
+    ServerChangeWeapon();
     OutErrorMessage = "";
     return true;
 }
@@ -131,12 +130,25 @@ bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
 bool USWeaponComponent::CanFire(FString& OutErrorMessage)
 {
     ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
-    if (CachedCurrentWeapon)
+    if (!CachedCurrentWeapon)
     {
-        return GetCurrentWeapon()->CanFire(OutErrorMessage);
+        OutErrorMessage = "NOCURRENTWEAPON";
+        return false;
     }
 
-    OutErrorMessage = "NoCurrentWeapon";
+
+    bool bCanWeaponFire = CachedCurrentWeapon->CanFire(OutErrorMessage);
+    if (bCanWeaponFire)
+    {
+        return true;
+    }
+
+    if (OutErrorMessage == "NOAMMO")
+    {
+        FString OutReloadErrorMessage;
+        TryReload(OutReloadErrorMessage);
+        return false;
+    }
     return false;
 }
 
@@ -144,12 +156,11 @@ bool USWeaponComponent::CanChangeWeapon(FString& OutErrorReason)
 {
     if (WeaponInventory.Num() == 0)
     {
-        OutErrorReason = "InventoryEmpty";
+        OutErrorReason = "INVENTORYEMPTY";
         return false;
     }
 
     return true;
-
 }
 
 void USWeaponComponent::ServerFire_Implementation()
@@ -202,35 +213,78 @@ bool USWeaponComponent::ServerReload_Validate()
     return true;
 }
 
-void USWeaponComponent::ServerEquipWeapon_Implementation(ASWeapon* Weapon)
+void USWeaponComponent::ServerCancelReload_Implementation()
 {
+    ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
+    if (CachedCurrentWeapon)
+    {
+        CachedCurrentWeapon->CancelReload();
+    }
+}
+
+bool USWeaponComponent::ServerCancelReload_Validate()
+{
+    return true;
+}
+
+void USWeaponComponent::EquipWeapon(ASWeapon* Weapon)
+{
+    if (!GetOwner()->HasAuthority())
+    {
+        return;
+    }
+
     if (Weapon == nullptr)
     {
         return;
     }
 
-    FString StopFireErrorMessage;
-    TryStopFire(StopFireErrorMessage);
-
     ASWeapon* CachedCurrentWeapon = GetCurrentWeapon();
     CurrentWeapon = Weapon;
     OnRep_CurrentWeapon(CachedCurrentWeapon);
-
 }
 
-bool USWeaponComponent::ServerEquipWeapon_Validate(ASWeapon* Weapon)
+void USWeaponComponent::ServerChangeWeapon_Implementation()
+{
+    FString StopFireErrorMessage;
+    TryStopFire(StopFireErrorMessage);
+    CancelReload();
+    
+    float ChangeWeaponDuration = 0.1f;
+    if (WeaponSwapMontage)
+    {
+        ChangeWeaponDuration = WeaponSwapMontage->GetPlayLength();
+        PlayMontage(WeaponSwapMontage);
+    }
+
+    GetWorld()->GetTimerManager().SetTimer(TimerHandle_WeaponSwapTimer, this, &USWeaponComponent::ChangeWeapon, ChangeWeaponDuration, false);
+}
+
+bool USWeaponComponent::ServerChangeWeapon_Validate()
 {
     return true;
 }
 
+void USWeaponComponent::ChangeWeapon()
+{
+    int32 CurrentWeaponIndex = WeaponInventory.Find(CurrentWeapon);
+    if (CurrentWeaponIndex == WeaponInventory.Num() - 1)
+    {
+        EquipWeapon(WeaponInventory[0]);
+    }
+    else if (CurrentWeaponIndex != INDEX_NONE)
+    {
+        CurrentWeaponIndex++;
+        EquipWeapon(WeaponInventory[CurrentWeaponIndex]);
+    }
+}
+
 void USWeaponComponent::SetupWeapon(ASWeapon* Weapon)
 {
-
-    USkeletalMeshComponent* OwningMesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
-    CurrentWeapon->AttachToComponent(OwningMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocket);
-
     if (Weapon)
     {
+        USkeletalMeshComponent* OwningMesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+        CurrentWeapon->AttachToComponent(OwningMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocket);
         Weapon->WeaponActivated();
     }
 }
@@ -243,6 +297,29 @@ void USWeaponComponent::UnsetupWeapon(ASWeapon* Weapon)
     }
 }
 
+void USWeaponComponent::PlayMontage(UAnimMontage* MontageToPlay)
+{
+    if (!GetOwner()->HasAuthority())
+    {
+        ServerPlayMontage(MontageToPlay);
+        return;
+    }
+
+    ReplicatedAnimationInfo.bStopPlaying = false;
+    ReplicatedAnimationInfo.Montage = MontageToPlay;
+    ReplicatedAnimationInfo.ForceReplication();
+    OnRep_ReplicatedAnimationInfo();
+}
+
+void USWeaponComponent::ServerPlayMontage_Implementation(UAnimMontage* Animation)
+{
+    PlayMontage(Animation);
+}
+
+bool USWeaponComponent::ServerPlayMontage_Validate(UAnimMontage* Animation)
+{
+    return true;
+}
 
 ASWeapon* USWeaponComponent::GetCurrentWeapon()
 {
@@ -253,7 +330,6 @@ TArray<ASWeapon*> USWeaponComponent::GetWeaponInventory()
 {
     return WeaponInventory;
 }
-
 
 void USWeaponComponent::OnRep_CurrentWeapon(ASWeapon* LastEquippedWeapon)
 {
@@ -278,4 +354,27 @@ void USWeaponComponent::OnRep_WeaponInventory()
     {
         WeaponWidget->RefreshWeapons();
     }
+}
+
+void USWeaponComponent::OnRep_ReplicatedAnimationInfo()
+{
+    USkeletalMeshComponent* OwnerSkelMeshComponent = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+    UAnimInstance* OwnerAnimInstance = OwnerSkelMeshComponent ? OwnerSkelMeshComponent->GetAnimInstance() : nullptr;
+    if (!OwnerAnimInstance)
+    {
+        return;
+    }
+
+    if (ReplicatedAnimationInfo.bStopPlaying)
+    {
+        if (OwnerAnimInstance->Montage_IsPlaying(ReplicatedAnimationInfo.Montage))
+        {
+            OwnerAnimInstance->Montage_Stop(0.0f, ReplicatedAnimationInfo.Montage);
+        }
+        return;
+    }
+
+    OwnerAnimInstance->Montage_Play(ReplicatedAnimationInfo.Montage);
+
 }

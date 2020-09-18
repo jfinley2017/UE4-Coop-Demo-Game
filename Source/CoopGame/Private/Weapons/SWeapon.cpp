@@ -3,24 +3,21 @@
 #include "DrawDebugHelpers.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "SHealthComponent.h"
-#include "TeamComponent.h"
-#include "SHitIndicatorWidget.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 #include "Runtime/AIModule/Classes/AIController.h"
 #include "Runtime/AIModule/Classes/BehaviorTree/BehaviorTreeComponent.h"
-#include "Runtime/GameplayTags/Classes/GameplayTagContainer.h"
 #include "Kismet/GameplayStatics.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "ConstructorHelpers.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "SWeaponComponent.h"
 
 ASWeapon::ASWeapon()
 {
     MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComponent"));
-
     RootComponent = MeshComp;
 
 	MeshComp->SetCollisionResponseToChannel(COLLISION_HITSCAN_OVERLAP, ECR_Ignore);
@@ -41,14 +38,7 @@ void ASWeapon::BeginPlay()
 {
     Super::BeginPlay();
 
-    APawn* MyPawn = Cast<APawn>(GetOwner());
-
-    // Potentially move to sweaponcomp so that each weapon can specify a different crosshair
-    if (HitIndicatorWidgetClass && MyPawn && MyPawn->IsPlayerControlled())
-    {
-        HitIndicatorWidget = CreateWidget<USHitIndicatorWidget>(GetWorld(), HitIndicatorWidgetClass);
-        HitIndicatorWidget->AddToViewport();
-    }
+    RefreshOwnerInfo(GetOwner());
 }
 
 void ASWeapon::WeaponActivated()
@@ -71,54 +61,57 @@ void ASWeapon::WeaponActivated()
         }
     }
 
-    OnWeaponActivated();
+    ReceiveWeaponActivated();
 }
 
 void ASWeapon::WeaponDeactivated()
 {
     SetActorHiddenInGame(true);
-
-    OnWeaponDeactivated();
+    ReceiveWeaponDeactivated();
 }
 
 void ASWeapon::StartFire()
 {
     FString CanFireErrorMessage;
-    if (!CanFire(CanFireErrorMessage) || GetWorldTimerManager().IsTimerActive(TimerHandle_TimeBetweenShots)) { return; }
+    if (!CanFire(CanFireErrorMessage)) 
+    { 
+        return; 
+    }
 
     // If this weapon has fired prior to us attempting to start fire
     float FirstDelay = FMath::Max(LastFireTime + TimeBetweenShots - GetWorld()->TimeSeconds, 0.0f);
+	GetWorldTimerManager().SetTimer(TimerHandle_FireLoop, this, &ASWeapon::FireLoop, TimeBetweenShots, true, FirstDelay);
+}
 
-	// Timer used with lambda to avoid creation of a function which is seemingly in the same scope as StartFire()
-	GetWorldTimerManager().SetTimer(TimerHandle_TimeBetweenShots, [&]()
-	{
-        FString CanFireErrorMessage;
-        if (!CanFire(CanFireErrorMessage))
-        {
-            StopFire();
-            return;
-        }
-		CancelReload();
-		Fire();
-        
-	}, TimeBetweenShots, true, FirstDelay);
+void ASWeapon::FireLoop()
+{
+    FString OutFireErrorMessage;
+    if (!CanFire(OutFireErrorMessage))
+    {
+        StopFire();
+        return;
+    }
+
+    Fire();
 }
 
 void ASWeapon::Fire()
 {
+    // we only want to fire on the server at the moment
     if (!HasAuthority())
     {
-        ServerFire();
+        return;
     }
 
-    OnFire();	
+    ReceiveFire();	
+
+    ConsumeAmmo(AmmoConsumedPerFire);
 	LastFireTime = UGameplayStatics::GetTimeSeconds(GetWorld());
+}
 
-    if (HasAuthority())
-    {
-		OnWeaponFire.ExecuteIfBound();
-        ConsumeAmmo(AmmoConsumedPerFire);
-    }
+void ASWeapon::StopFire()
+{
+    GetWorldTimerManager().ClearTimer(TimerHandle_FireLoop);
 }
 
 void ASWeapon::AIFire_Implementation()
@@ -126,28 +119,32 @@ void ASWeapon::AIFire_Implementation()
     Fire();
 }
 
-void ASWeapon::ConsumeAmmo_Implementation(float AmmoToConsume)
+void ASWeapon::ConsumeAmmo(float AmmoToConsume)
 {
-    if (HasAuthority())
+    if (!HasAuthority())
     {
-        AmmoInClip -= AmmoToConsume;
+        return;
     }
-}
-bool ASWeapon::ConsumeAmmo_Validate(float AmmoToConsume) { return true; }
 
-void ASWeapon::ServerFire_Implementation()
-{
-    Fire();
+    AmmoInClip -= AmmoToConsume;
 }
-bool ASWeapon::ServerFire_Validate() { return true; }
-
 
 bool ASWeapon::CanFire(FString& OutErrorMessage)
 {
     // Reload the weapon if this check fails
     if (!HasAmmoRequiredToFire(true))
     {
-        OutErrorMessage = "NO_AMMO";
+        OutErrorMessage = "NOAMMO";
+        return false;
+    }
+
+    float CurrentTime = UGameplayStatics::GetTimeSeconds(GetWorld());
+    bool bIsOnCooldown = (LastFireTime + TimeBetweenShots > CurrentTime 
+                          && !UKismetMathLibrary::NearlyEqual_FloatFloat(LastFireTime + TimeBetweenShots, CurrentTime, 0.1f));
+
+    if (LastFireTime > 0.0f && bIsOnCooldown)
+    {
+        OutErrorMessage = "FIRECOOLDOWNACTIVE";
         return false;
     }
 
@@ -164,82 +161,60 @@ bool ASWeapon::HasAmmoRequiredToFire(bool bReloadIfFalse)
     return false;
 }
 
-void ASWeapon::StopFire()
+bool ASWeapon::IsReloading()
 {
-    GetWorldTimerManager().ClearTimer(TimerHandle_TimeBetweenShots);
+    UAnimInstance* OwningAnimInstance = OwnerInfo.OwningSkeletalMeshComponent.IsValid()
+        ? OwnerInfo.OwningSkeletalMeshComponent->GetAnimInstance() : nullptr;
+
+    if (!OwningAnimInstance)
+    {
+        // I guess?
+        return false;
+    }
+
+    return OwningAnimInstance->Montage_IsPlaying(ReloadAnimation);
 }
 
 void ASWeapon::Reload()
 {
-    if (bIsReloading || AmmoInClip == ClipSize) { return; }
-
-    if (ReloadSound)
-    {
-        UGameplayStatics::PlaySoundAtLocation(GetWorld(), ReloadSound, GetActorLocation());
+    if (IsReloading() || AmmoInClip == ClipSize) 
+    { 
+        return; 
     }
 
-    OnReload.ExecuteIfBound();
+    // Currently this is server only (USWC server designated function calls this)
+    // Sound won't be played 
+    /*if (ReloadSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), ReloadSound, GetActorLocation());
+    }*/
 
-    ServerReload();
+    
+    if (!ReloadAnimation || !OwnerInfo.OwningWeaponComponent.IsValid())
+    {
+        return;
+    }
+        
+    OwnerInfo.OwningWeaponComponent->PlayMontage(ReloadAnimation);
+    float AnimationTime = ReloadAnimation->GetPlayLength();
+    GetWorldTimerManager().SetTimer(TimerHandle_Reload, this, &ASWeapon::FinishReload, AnimationTime, false);
 }
 
-void ASWeapon::ServerReload_Implementation()
+void ASWeapon::FinishReload()
 {
-    bIsReloading = true;
-
-    OnReload.ExecuteIfBound();
-
-    GetWorldTimerManager().SetTimer(TimerHandle_ReloadTimer, [&]() {
-        ConsumeAmmo(-(ClipSize - AmmoInClip));
-        bIsReloading = false;
-    }, TimeToReload, false);
+    ConsumeAmmo(-(ClipSize - AmmoInClip));
+    bIsReloading = false;
 }
-bool ASWeapon::ServerReload_Validate() { return true; }
+
+void ASWeapon::RefreshOwnerInfo(AActor* InOwner)
+{
+    OwnerInfo.OwnerAsPawn = Cast<APawn>(InOwner);
+    OwnerInfo.OwningSkeletalMeshComponent = InOwner ? InOwner->FindComponentByClass<USkeletalMeshComponent>() : nullptr; 
+    OwnerInfo.OwningWeaponComponent = InOwner ? InOwner->FindComponentByClass<USWeaponComponent>() : nullptr;
+}
 
 void ASWeapon::CancelReload()
 {
     bIsReloading = false;
-    GetWorldTimerManager().ClearTimer(TimerHandle_ReloadTimer);
-
-    if (!HasAuthority())
-    {
-        ServerCancelReload();
-    }
+    GetWorldTimerManager().ClearTimer(TimerHandle_Reload);
 }
-
-void ASWeapon::ServerCancelReload_Implementation()
-{
-    CancelReload();
-}
-bool ASWeapon::ServerCancelReload_Validate() { return true; }
-
-/**
- * @param HitActor If this actor is on the other team the weapon hit will be broadcast
- * @param bSkipCheck If true, broadcast weapon hit regardless
- */
-void ASWeapon::OnHit(AActor* HitActor, bool bSkipCheck)
-{
-    if (!HitIndicatorWidget || (!HitActor && !bSkipCheck))
-    {
-        return;
-    }
-
-    if (bSkipCheck)
-    {
-        HitIndicatorWidget->PlayHitAnimation();
-        OnWeaponHit.Broadcast(HitActor);
-        return;
-    }
-
-    // Perhaps team checks should be abstracted to something like gamemode, unsure
-    USHealthComponent* HitHealth = Cast<USHealthComponent>(HitActor->GetComponentByClass(USHealthComponent::StaticClass()));
-    if (HitHealth && GetOwner())
-    {
-        if (HitIndicatorWidget && !UTeamComponent::IsActorFriendly(HitActor, GetOwner()))
-        {
-            HitIndicatorWidget->PlayHitAnimation();
-            OnWeaponHit.Broadcast(HitActor);
-        }
-    }
-}
-

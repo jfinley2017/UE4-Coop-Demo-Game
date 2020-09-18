@@ -150,7 +150,7 @@ void ASHitscanWeapon::OnTraceHit(FHitResult Hit, FVector ShotDirection, bool bDo
 
     // Get surface type to use to calculate damage multipler/impact effects
     EPhysicalSurface SurfaceType = UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get());
-    OnHit(HitActor);
+    
 
     // Calculate and apply damage for this shot
     if (bDoDamage)

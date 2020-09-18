@@ -163,10 +163,7 @@ void ASProjectile::Explode()
 
 		ASWeapon* MyOwner = Cast<ASWeapon>(GetOwner());
 
-		if (HitSomething && MyOwner)
-		{
-			MyOwner->OnHit(nullptr, true);
-		}
+		
 
 		SetLifeSpan(0.5f);
 	}
