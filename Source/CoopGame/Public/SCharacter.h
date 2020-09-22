@@ -34,12 +34,6 @@ public:
     virtual FVector GetPawnViewLocation() const override;
     virtual void GetActorEyesViewPoint(FVector&, FRotator& ) const override;
 
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "PlayerWeapon")
-    float GetReloadSpeed();
-
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "PlayerWeapon")
-    bool GetIsReloading();
-
     /**  Weapon operations, calling these from character for now because we might want to play animations/whatever
      *	 before firing/on changing weapons
     */
@@ -169,9 +163,6 @@ protected:
 
     void BeginSprint();
     void EndSprint();
-
-
-
 
     UFUNCTION(BlueprintCallable, Category = "PlayerActions")
     bool CanSprint();

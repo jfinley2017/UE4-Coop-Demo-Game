@@ -32,23 +32,6 @@ void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 }
 
-USWeaponWidget* USWeaponComponent::DrawWeaponWidget(APlayerController* OwningController, int32 NumberWeaponSlots)
-{
-    if (OwningController)
-    {
-        WeaponWidget = CreateWidget<USWeaponWidget>(OwningController, WeaponsWidgetClass);
-
-        if (WeaponWidget)
-        {
-            WeaponWidget->InitializeWeaponWidget(this, NumberWeaponSlots);
-            return WeaponWidget;
-        }
-    }
-
-    UE_LOG(LogTemp, Error, TEXT("DrawWeaponWidget called without owning controller, this is confusing"));
-    return nullptr;
-}
-
 void USWeaponComponent::SpawnDefaultWeaponInventory()
 {
     // We want the server to own these actors
@@ -110,11 +93,6 @@ bool USWeaponComponent::TryReload(FString& ErrorMessage)
     return true;
 }
 
-void USWeaponComponent::CancelReload()
-{
-    ServerCancelReload();
-}
-
 bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
 {
     if (!CanChangeWeapon(OutErrorMessage))
@@ -125,6 +103,11 @@ bool USWeaponComponent::TryChangeWeapon(FString& OutErrorMessage)
     ServerChangeWeapon();
     OutErrorMessage = "";
     return true;
+}
+
+void USWeaponComponent::CancelReload()
+{
+    ServerCancelReload();
 }
 
 bool USWeaponComponent::CanFire(FString& OutErrorMessage)
@@ -340,20 +323,7 @@ void USWeaponComponent::OnRep_CurrentWeapon(ASWeapon* LastEquippedWeapon)
 
 void USWeaponComponent::OnRep_WeaponInventory()
 {
-    for (ASWeapon* Weapon : WeaponInventory)
-    {
-        if (!Weapon)
-        {
-            return;
-        }
-    }
-
     OnWeaponInventoryUpdated.Broadcast();
-
-    if (WeaponWidget)
-    {
-        WeaponWidget->RefreshWeapons();
-    }
 }
 
 void USWeaponComponent::OnRep_ReplicatedAnimationInfo()

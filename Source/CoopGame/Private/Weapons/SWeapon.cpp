@@ -30,7 +30,6 @@ void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(ASWeapon, bIsReloading);
     DOREPLIFETIME(ASWeapon, AmmoInClip);
 }
 
@@ -203,7 +202,6 @@ void ASWeapon::Reload()
 void ASWeapon::FinishReload()
 {
     ConsumeAmmo(-(ClipSize - AmmoInClip));
-    bIsReloading = false;
 }
 
 void ASWeapon::RefreshOwnerInfo(AActor* InOwner)
@@ -215,6 +213,5 @@ void ASWeapon::RefreshOwnerInfo(AActor* InOwner)
 
 void ASWeapon::CancelReload()
 {
-    bIsReloading = false;
     GetWorldTimerManager().ClearTimer(TimerHandle_Reload);
 }

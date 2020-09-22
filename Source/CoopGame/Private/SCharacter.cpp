@@ -162,25 +162,7 @@ FVector ASCharacter::GetSize()
         GetCapsuleComponent()->GetScaledCapsuleHalfHeight()*2);
 }
 
-float ASCharacter::GetReloadSpeed()
-{
-	if (WeaponComp && WeaponComp->GetCurrentWeapon())
-	{
-		return WeaponComp->GetCurrentWeapon()->TimeToReload;
-	}
 
-	return 10.0f; // this should make the anim look horribly wrong so that something is obviously wrong
-}
-
-bool ASCharacter::GetIsReloading()
-{
-	if (WeaponComp && WeaponComp->GetCurrentWeapon())
-	{
-		return WeaponComp->GetCurrentWeapon()->bIsReloading;
-	}
-
-	return false;
-}
 
 void ASCharacter::StartFire()
 {

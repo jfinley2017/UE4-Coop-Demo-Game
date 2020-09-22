@@ -12,7 +12,6 @@ class ASWeapon;
 class UImage;
 class UTexture2D;
 
-
 //////////////////////////////////////////////////////////////////////////
 // Support
 // 1.) Firing, effects, anims. TryStartFire -> [Server] ServerStartFire -> Weapon->Fire() -> FireLoop
@@ -24,18 +23,30 @@ class UTexture2D;
 // 3.) Changing Weapons, effects, anims
 //////////////////////////////////////////////////////////////////////////
 
-
+/**
+ * Struct to drive replication of weapon animations, runs gameplay logic from (as an example)
+ * an OnRep function associated with this variable.
+ */
 USTRUCT()
 struct FSReplicatedAnimMontageInfo
 {
     GENERATED_BODY()
 
+    /**
+     * Montage to play, or stop playing if @bStopPlaying is true
+     */
     UPROPERTY()
     UAnimMontage* Montage = nullptr;
 
+    /**
+     * Whether or not to start or stop the montage. Should be used to either stop playing @Montage or start playing @Montage
+     */
     UPROPERTY()
     bool bStopPlaying = false;
 
+    /**
+     * Forces a replication update on this struct, useful for replaying an animation.
+     */
     UPROPERTY()
     uint8 ForceReplicationByte = 1;
 
@@ -119,12 +130,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
     virtual void PlayMontage(UAnimMontage* MontageToPlay);
 
-    UFUNCTION(BlueprintCallable, Category = "WeaponComponent")
-    USWeaponWidget* DrawWeaponWidget(APlayerController* OwningController, int32 NumberWeaponSlots);
-
+    /**
+     * Retreives the current weapon.
+     */
     UFUNCTION(BlueprintPure, Category = "WeaponComponent")
     ASWeapon* GetCurrentWeapon();
 
+    /**
+     * Retreives the weapon inventory.
+     */
     UFUNCTION(BlueprintPure, Category = "WeaponComponent")
     TArray<ASWeapon*> GetWeaponInventory();
 
@@ -153,9 +167,15 @@ protected:
     UFUNCTION()
     virtual bool CanChangeWeapon(FString& OutErrorReason);
 
+    /**
+     * Sets up @Weapon to be the currently equipped weapon
+     */
     UFUNCTION()
     virtual void SetupWeapon(ASWeapon* Weapon);
 
+    /**
+     * Removes @Weapon, making it no longer equipped
+     */
     UFUNCTION()
     virtual void UnsetupWeapon(ASWeapon* Weapon);
 
@@ -182,32 +202,47 @@ protected:
 
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerPlayMontage(UAnimMontage* Animation);
+    
+    /**
+     * Where to equip weapons on our owner's skeleton
+     */
+    UPROPERTY(VisibleDefaultsOnly, Category = "Player")
+    FName WeaponSocket = "WeaponSocket";
 
+    /**
+     * Montage to use when swapping weapons, potentially to be moved into ASWeapon
+     */
     UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
     UAnimMontage* WeaponSwapMontage = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
-    FName WeaponSocket = "WeaponSocket";
-
+    /**
+     * Default weapons to be spawned for the owner on BeginPlay.
+     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WeaponComponent|Data")
     TArray<TSubclassOf<ASWeapon>> DefaultWeapons;
 
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponComponent|Data")
-    TSubclassOf<USWeaponWidget> WeaponsWidgetClass = nullptr;
-
+    /**
+     * Replication of animations for weapons, see definition of FSReplicatedAnimMontageInfo
+     */
     UPROPERTY(ReplicatedUsing = OnRep_ReplicatedAnimationInfo)
     FSReplicatedAnimMontageInfo ReplicatedAnimationInfo;
 
-    UPROPERTY(ReplicatedUsing = OnRep_WeaponInventory)
-    TArray<ASWeapon*> WeaponInventory;
-
+    /**
+    * Currently equipped/activated weapons.
+    */
     UPROPERTY(ReplicatedUsing = OnRep_CurrentWeapon)
     ASWeapon* CurrentWeapon;
-
+    
+    /**
+     * Currently owned weapons.
+     */
+    UPROPERTY(ReplicatedUsing = OnRep_WeaponInventory)
+    TArray<ASWeapon*> WeaponInventory;
+    
+    /**
+     * Runs weapon swapping
+     */
     FTimerHandle TimerHandle_WeaponSwapTimer;
-
-    // Get rid of
-    USWeaponWidget* WeaponWidget = nullptr;
 
     UFUNCTION()
     void OnRep_CurrentWeapon(ASWeapon* LastEquippedWeapon);
