@@ -210,9 +210,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
     UTexture2D* WeaponIcon = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, Category = "WeaponData")
-    TSubclassOf<USHitIndicatorWidget> HitIndicatorWidgetClass;   
-
     // ~ turn into data table
     //////////////////////////////////////////////////////////////////////////
 
@@ -221,9 +218,6 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     USkeletalMeshComponent* MeshComp = nullptr;
-
-     /** Widget reference displayed when this weapon hits something */
-    USHitIndicatorWidget* HitIndicatorWidget = nullptr;
 
     /** 
      * The current amount of ammo in our clip, if this number is less than AmmoRequiredToFire, HasAmmoRequiredToFire will fail 
