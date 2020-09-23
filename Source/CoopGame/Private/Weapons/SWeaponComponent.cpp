@@ -119,6 +119,11 @@ bool USWeaponComponent::CanFire(FString& OutErrorMessage)
         return false;
     }
 
+    if (IsChangingWeapons())
+    {
+        OutErrorMessage = "CHANGINGWEAPON";
+        return false;
+    }
 
     bool bCanWeaponFire = CachedCurrentWeapon->CanFire(OutErrorMessage);
     if (bCanWeaponFire)
@@ -236,7 +241,7 @@ void USWeaponComponent::ServerChangeWeapon_Implementation()
     float ChangeWeaponDuration = 0.1f;
     if (WeaponSwapMontage)
     {
-        ChangeWeaponDuration = WeaponSwapMontage->GetPlayLength();
+        ChangeWeaponDuration = WeaponSwapMontage->GetPlayLength()-.1f;
         PlayMontage(WeaponSwapMontage);
     }
 
@@ -278,6 +283,18 @@ void USWeaponComponent::UnsetupWeapon(ASWeapon* Weapon)
     {
         Weapon->WeaponDeactivated();
     }
+}
+
+bool USWeaponComponent::IsChangingWeapons()
+{
+    USkeletalMeshComponent* OwnerSkelMeshComponent = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+    UAnimInstance* OwnerAnimInstance = OwnerSkelMeshComponent ? OwnerSkelMeshComponent->GetAnimInstance() : nullptr;
+
+    if (OwnerAnimInstance)
+    {
+        return OwnerAnimInstance->Montage_IsPlaying(WeaponSwapMontage);
+    }
+    return false;
 }
 
 void USWeaponComponent::PlayMontage(UAnimMontage* MontageToPlay)

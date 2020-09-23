@@ -152,12 +152,7 @@ bool ASWeapon::CanFire(FString& OutErrorMessage)
 
 bool ASWeapon::HasAmmoRequiredToFire(bool bReloadIfFalse)
 {
-    if (AmmoInClip >= AmmoRequiredToFire)
-    {
-        return true;
-    }
-    Reload();
-    return false;
+    return AmmoInClip >= AmmoRequiredToFire;
 }
 
 bool ASWeapon::IsReloading()
@@ -180,14 +175,6 @@ void ASWeapon::Reload()
     { 
         return; 
     }
-
-    // Currently this is server only (USWC server designated function calls this)
-    // Sound won't be played 
-    /*if (ReloadSound)
-    {
-        UGameplayStatics::PlaySoundAtLocation(GetWorld(), ReloadSound, GetActorLocation());
-    }*/
-
     
     if (!ReloadAnimation || !OwnerInfo.OwningWeaponComponent.IsValid())
     {

@@ -131,7 +131,7 @@ public:
     virtual void PlayMontage(UAnimMontage* MontageToPlay);
 
     /**
-     * Retreives the current weapon.
+     * Retrieves the current weapon.
      */
     UFUNCTION(BlueprintPure, Category = "WeaponComponent")
     ASWeapon* GetCurrentWeapon();
@@ -178,6 +178,12 @@ protected:
      */
     UFUNCTION()
     virtual void UnsetupWeapon(ASWeapon* Weapon);
+
+    /**
+     * Returns whether or not we are in the middle of changing weapons
+     */
+    UFUNCTION()
+    bool IsChangingWeapons();
 
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerFire();
