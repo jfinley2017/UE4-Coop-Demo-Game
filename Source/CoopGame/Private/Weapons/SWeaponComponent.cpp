@@ -20,6 +20,12 @@ void USWeaponComponent::BeginPlay()
 	Super::BeginPlay();
 
     SpawnDefaultWeaponInventory();
+    if (GetOwner()->HasAuthority())
+    {
+        USkeletalMeshComponent* OwnerSkelMeshComponent = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+        UAnimInstance* OwnerAnimInstance = OwnerSkelMeshComponent ? OwnerSkelMeshComponent->GetAnimInstance() : nullptr;
+        OwnerAnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &USWeaponComponent::HandleWeaponSwapAnimNotify);
+    }
 }
 
 void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -34,7 +40,6 @@ void USWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 void USWeaponComponent::SpawnDefaultWeaponInventory()
 {
-    // We want the server to own these actors
     if (!GetOwner()->HasAuthority())
     {
         return;
@@ -147,7 +152,6 @@ bool USWeaponComponent::CanChangeWeapon(FString& OutErrorReason)
         OutErrorReason = "INVENTORYEMPTY";
         return false;
     }
-
     return true;
 }
 
@@ -241,11 +245,9 @@ void USWeaponComponent::ServerChangeWeapon_Implementation()
     float ChangeWeaponDuration = 0.1f;
     if (WeaponSwapMontage)
     {
-        ChangeWeaponDuration = WeaponSwapMontage->GetPlayLength()-.1f;
         PlayMontage(WeaponSwapMontage);
     }
 
-    GetWorld()->GetTimerManager().SetTimer(TimerHandle_WeaponSwapTimer, this, &USWeaponComponent::ChangeWeapon, ChangeWeaponDuration, false);
 }
 
 bool USWeaponComponent::ServerChangeWeapon_Validate()
@@ -319,6 +321,16 @@ void USWeaponComponent::ServerPlayMontage_Implementation(UAnimMontage* Animation
 bool USWeaponComponent::ServerPlayMontage_Validate(UAnimMontage* Animation)
 {
     return true;
+}
+
+
+void USWeaponComponent::HandleWeaponSwapAnimNotify(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
+{
+    if (NotifyName != "WeaponSwap")
+    {
+        return;
+    }
+    ChangeWeapon();
 }
 
 ASWeapon* USWeaponComponent::GetCurrentWeapon()

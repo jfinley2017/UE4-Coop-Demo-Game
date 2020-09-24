@@ -209,6 +209,9 @@ protected:
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerPlayMontage(UAnimMontage* Animation);
     
+    UFUNCTION()
+    void HandleWeaponSwapAnimNotify(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
+     
     /**
      * Where to equip weapons on our owner's skeleton
      */

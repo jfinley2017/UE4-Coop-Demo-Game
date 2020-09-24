@@ -147,6 +147,12 @@ bool ASWeapon::CanFire(FString& OutErrorMessage)
         return false;
     }
 
+    if (IsReloading())
+    {
+        OutErrorMessage = "RELOADING";
+        return false;
+    }
+
     return true;
 }
 
@@ -182,7 +188,7 @@ void ASWeapon::Reload()
     }
         
     OwnerInfo.OwningWeaponComponent->PlayMontage(ReloadAnimation);
-    float AnimationTime = ReloadAnimation->GetPlayLength();
+    float AnimationTime = ReloadAnimation->GetPlayLength() - 0.5f;
     GetWorldTimerManager().SetTimer(TimerHandle_Reload, this, &ASWeapon::FinishReload, AnimationTime, false);
 }
 
