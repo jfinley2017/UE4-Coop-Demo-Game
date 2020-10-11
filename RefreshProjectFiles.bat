@@ -5,37 +5,56 @@ set PathToEngine=C:\Unreal\EngineInstalls\UE_4.24
 set ProjectName=CoopGame
 :: End Setup
 
-@echo Removing .vs folder
-cd %~dp0 
-if exist .vs RD /s /q "%cd%\.vs"
+if exist %~dp0\.vs (
+	@echo Removing .vs folder
+	RD /s /q %~dp0\.vs
+) else (
+	@echo Cannot Remove .vs Directory - No .vs Directory
+)
 
-@echo Removing vs solution
-del /q "*.sln"
+if exist %ProjectName%.sln (
+	@echo Removing vs solution
+	del /q %ProjectName%.sln
+) else ( 
+	@echo Count Not Delete .sln - %ProjectName%.sln Does Not Exist.
+)
 
 :: Note that I am not simply removing the entirety of the build/intermediate directories
 :: as in some cases it is useful to symbolic link folders. By deleting only the contents of the 
 :: folders, we maintain the link
 
-@echo Removing Binaries
-cd %~dp0\Binaries
-for /r %%a in (*) do (
-	del /q /s "%%a"
+if exist %~dp0\Binaries (
+	@echo Removing Binaries
+	cd %~dp0\Binaries
+	for /r %%a in (*) do (
+		del /q /s "%%a"
+	)
+	for /d %%a in (*) do (
+		rmdir /q /s "%%a"
+	)
+) else (
+	@echo Cannot Clear Binaries - No Binaries Directories
 )
 
-for /d %%a in (*) do (
-	rmdir /q /s "%%a"
+if exist %~dp0\Intermediate (
+	@echo Removing Intermediate
+	cd %~dp0\Intermediate
+	for /r %%a in (*) do (
+		del /q /s "%%a"
+	)
+	for /d %%a in (*) do (
+		rmdir /q /s "%%a"
+	)
+) else (
+	@echo Cannot Clear Intermediates - No Intermiedates Directories
 )
 
-@echo Removing Intermediates
-cd %~dp0\Intermediate
-for /r %%a in (*) do (
-	del /q /s "%%a"
+set UProjectPath=%~dp0%ProjectName%.uproject
+if exist %UProjectPath% (
+	@echo Generating New Project Files
+	"%PathToEngine%\Engine\Binaries\DotNET\UnrealBuildTool.exe" -projectfiles -project=%UProjectPath% -game -rocket -progress
+) else (
+	@echo %UProjectPath% does not exist, cannot regenerate project files.
 )
 
-for /d %%a in (*) do (
-	rmdir /q /s "%%a"
-)
-
-@echo Generating New Project Files
-set UProjectPath=%~dp0\%ProjectName%.uproject
-"%PathToEngine%\Engine\Binaries\DotNET\UnrealBuildTool.exe" -projectfiles -project=%UProjectPath% -game -rocket -progress
+pause
